@@ -126,6 +126,13 @@ func (k *patchNotificationKind) Name() string {
 	return fleet.PatchNotificationKind
 }
 
+// DeliversViaScript reports whether the dispatch loop queues the shared
+// notification script for this kind. Patch notifications display through the
+// script running Fleet Desktop's notify command.
+func (k *patchNotificationKind) DeliversViaScript() bool {
+	return true
+}
+
 func (svc *Service) createPatchNotificationForEndUser(ctx context.Context, host *fleet.Host, install *fleet.HostSoftwareInstallerResult) error {
 	if install.SoftwareTitleID == nil {
 		svc.logger.InfoContext(ctx, "not notifying about a skipped patch for software with no title",

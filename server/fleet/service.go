@@ -372,6 +372,11 @@ type Service interface {
 	// ListLabelsForHost returns a slice of labels for a given host
 	ListLabelsForHost(ctx context.Context, hostID uint) ([]*Label, error)
 
+	// SendMessageToHost queues a message notification for a host's end user.
+	SendMessageToHost(ctx context.Context, hostID uint, title, body string) (*MessageNotification, error)
+	// ListMessageNotifications returns message notifications, newest first.
+	ListMessageNotifications(ctx context.Context) ([]*MessageNotification, error)
+
 	// BatchValidateLabels validates that each of the provided label names exists,
 	// and verifies the provided label names belong to the given teamID.
 	//

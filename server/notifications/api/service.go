@@ -19,6 +19,7 @@ type Service interface {
 	SetNotificationPayloadService
 	CreateNotificationService
 	FailNotificationsForHostService
+	ListNotificationsService
 
 	// ExpireAndQueueNotifications gives up on notifications that are out of
 	// time, then queues a script for each one that is due.
@@ -29,6 +30,14 @@ type Service interface {
 	CleanupNotifications(ctx context.Context, retention time.Duration) error
 
 	RenderNotificationForHost(ctx context.Context, hostID uint, notificationUUID string) (*NotificationView, error)
+
+	// ListPendingNotificationsForHost returns the host's pending,
+	// never-displayed notifications for agent polling.
+	ListPendingNotificationsForHost(ctx context.Context, hostID uint) ([]ListedNotification, error)
+
+	// MarkNotificationDisplayed records the first time a notification reached
+	// its end user, for agents that report display directly.
+	MarkNotificationDisplayed(ctx context.Context, hostID uint, notificationUUID string) error
 
 	// ApplyAction carries out what an end user chose to do with one of the
 	// notifications on their host.
@@ -91,4 +100,21 @@ type SetNotificationStatusService interface {
 // notifications to failed.
 type FailNotificationsForHostService interface {
 	FailNotificationsForHost(ctx context.Context, hostID uint, reason string) error
+}
+
+// ListNotificationsService lists notifications for admin views.
+type ListNotificationsService interface {
+	ListEndUserNotificationsByKind(ctx context.Context, kind string, limit int) ([]*EndUserNotification, error)
+}
+
+// ListPendingNotificationsService lists a host's pending notifications for
+// agent polling.
+type ListPendingNotificationsService interface {
+	ListPendingNotificationsForHost(ctx context.Context, hostID uint) ([]ListedNotification, error)
+}
+
+// MarkDisplayedNotificationService records that a notification reached its
+// end user, for agents that report display directly.
+type MarkDisplayedNotificationService interface {
+	MarkNotificationDisplayed(ctx context.Context, hostID uint, notificationUUID string) error
 }

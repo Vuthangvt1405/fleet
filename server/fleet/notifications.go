@@ -13,4 +13,5 @@ type NotificationsWriteService interface {
 	api.SetNotificationStatusService
 	api.SetNotificationPayloadService
 	api.FailNotificationsForHostService
+	api.ListNotificationsService
 }

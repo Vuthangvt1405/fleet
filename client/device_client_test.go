@@ -81,6 +81,65 @@ func TestDeviceClientGetDesktopPayload(t *testing.T) {
 		require.EqualValues(t, "gogetit.com:6969", client.fleetAlternativeBrowserHostFromServer)
 	})
 }
+
+func TestDeviceClientListNotifications(t *testing.T) {
+	client, err := NewDeviceClient("https://test.com", true, "", nil, "")
+	token := "test_token"
+	require.NoError(t, err)
+
+	mockRequestDoer := &mockHTTPClient{}
+	client.SetHTTPClient(mockRequestDoer)
+
+	t.Run("returns pending notifications", func(t *testing.T) {
+		mockRequestDoer.statusCode = http.StatusOK
+		mockRequestDoer.resBody = `{"notifications": [{"uuid": "uuid-1", "kind": "message"}]}`
+		listed, err := client.ListNotifications(token)
+		require.NoError(t, err)
+		require.Len(t, listed, 1)
+		require.Equal(t, "uuid-1", listed[0].UUID)
+		require.Equal(t, "message", listed[0].Kind)
+	})
+
+	t.Run("returns empty when none pending", func(t *testing.T) {
+		mockRequestDoer.statusCode = http.StatusOK
+		mockRequestDoer.resBody = `{"notifications": []}`
+		listed, err := client.ListNotifications(token)
+		require.NoError(t, err)
+		require.Empty(t, listed)
+	})
+}
+
+func TestDeviceClientGetNotificationView(t *testing.T) {
+	client, err := NewDeviceClient("https://test.com", true, "", nil, "")
+	token := "test_token"
+	require.NoError(t, err)
+
+	mockRequestDoer := &mockHTTPClient{}
+	client.SetHTTPClient(mockRequestDoer)
+
+	mockRequestDoer.statusCode = http.StatusOK
+	mockRequestDoer.resBody = `{"uuid": "uuid-1", "title": "Blocked app detected", "description": "Please uninstall uTorrent.", "actions": [{"id": "dismiss", "label": "Dismiss"}]}`
+	view, err := client.GetNotificationView(token, "uuid-1")
+	require.NoError(t, err)
+	require.Equal(t, "uuid-1", view.UUID)
+	require.Equal(t, "Blocked app detected", view.Title)
+	require.Equal(t, "Please uninstall uTorrent.", view.Description)
+	require.Len(t, view.Actions, 1)
+	require.Equal(t, "dismiss", view.Actions[0].ID)
+}
+
+func TestDeviceClientMarkNotificationDisplayed(t *testing.T) {
+	client, err := NewDeviceClient("https://test.com", true, "", nil, "")
+	token := "test_token"
+	require.NoError(t, err)
+
+	mockRequestDoer := &mockHTTPClient{}
+	client.SetHTTPClient(mockRequestDoer)
+
+	mockRequestDoer.statusCode = http.StatusOK
+	mockRequestDoer.resBody = `{}`
+	require.NoError(t, client.MarkNotificationDisplayed(token, "uuid-1"))
+}
 func TestDeviceClientGetFleetHost(t *testing.T) {
 	testCases := []struct {
 		alternativeBrowserHostFromEnv    string

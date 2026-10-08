@@ -723,6 +723,8 @@ func runServeCmd(cmd *cobra.Command, configManager configpkg.Manager, debug, dev
 	// Register kinds here, and nowhere else.
 	patchNotificationKind := service.NewPatchNotificationKind(ds, svc, notificationsSvc, logger)
 	notificationsSvc.RegisterKind(patchNotificationKind)
+	messageNotificationKind := service.NewMessageNotificationKind(notificationsSvc, logger)
+	notificationsSvc.RegisterKind(messageNotificationKind)
 
 	// Bootstrap ACME service module
 	acmeSigner := &acmeCSRSigner{signer: scepdepot.NewSigner(scepStorage, scepdepot.WithValidityDays(config.MDM.AppleSCEPSignerValidityDays))}

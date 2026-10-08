@@ -31,6 +31,7 @@ const (
 	cancelHostActivity = fleet.ActionCancelHostActivity
 	transferHost       = fleet.ActionTransferHost
 	deleteHost         = fleet.ActionDeleteHost
+	sendMessage        = fleet.ActionSendMessage
 	clearPasscode      = fleet.ActionClearPasscode
 	rotateDiskKey      = fleet.ActionRotateDiskEncryptionKey
 	create             = fleet.ActionCreate
@@ -1361,6 +1362,25 @@ func TestAuthorizeHost(t *testing.T) {
 		{user: teamTechnician, object: hostTeam2, action: cancelHostActivity, allow: false},
 		{user: teamTechnician, object: hostTeam2, action: transferHost, allow: false},
 		{user: teamTechnician, object: hostTeam2, action: deleteHost, allow: false},
+
+		// Sending messages mirrors transfer_host: admins, maintainers,
+		// technicians and gitops, globally and on their own team.
+		{user: nil, object: host, action: sendMessage, allow: false},
+		{user: nil, object: hostTeam1, action: sendMessage, allow: false},
+		{user: test.UserNoRoles, object: host, action: sendMessage, allow: false},
+		{user: test.UserAdmin, object: host, action: sendMessage, allow: true},
+		{user: test.UserMaintainer, object: host, action: sendMessage, allow: true},
+		{user: test.UserTechnician, object: host, action: sendMessage, allow: true},
+		{user: test.UserGitOps, object: host, action: sendMessage, allow: true},
+		{user: test.UserObserver, object: host, action: sendMessage, allow: false},
+		{user: test.UserObserverPlus, object: host, action: sendMessage, allow: false},
+		{user: test.UserTeamAdminTeam1, object: hostTeam1, action: sendMessage, allow: true},
+		{user: test.UserTeamAdminTeam2, object: hostTeam1, action: sendMessage, allow: false},
+		{user: test.UserTeamMaintainerTeam1, object: hostTeam1, action: sendMessage, allow: true},
+		{user: test.UserTeamTechnicianTeam1, object: hostTeam1, action: sendMessage, allow: true},
+		{user: test.UserTeamTechnicianTeam2, object: hostTeam1, action: sendMessage, allow: false},
+		{user: test.UserTeamObserverTeam1, object: hostTeam1, action: sendMessage, allow: false},
+		{user: test.UserTeamGitOpsTeam1, object: hostTeam1, action: sendMessage, allow: true},
 	})
 }
 

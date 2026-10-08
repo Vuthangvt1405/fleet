@@ -24,6 +24,12 @@ type Datastore interface {
 	DeleteExpiredEndUserNotifications(ctx context.Context, olderThan time.Time, limit int) (int64, error)
 	VerifyEndUserNotification(ctx context.Context, notificationUUID string, displayedAt time.Time) error
 	DelayEndUserNotification(ctx context.Context, notificationUUID string, nextAttemptAt time.Time, payload json.RawMessage) error
+	// ListEndUserNotificationsByKind returns the newest notifications of a
+	// kind, newest first, up to limit. Used for admin history views.
+	ListEndUserNotificationsByKind(ctx context.Context, kind string, limit int) ([]*api.EndUserNotification, error)
+	// ListPendingEndUserNotificationsForHost returns the host's pending,
+	// never-displayed notifications, oldest first, for agent polling.
+	ListPendingEndUserNotificationsForHost(ctx context.Context, hostID uint) ([]api.ListedNotification, error)
 	// ActOnEndUserNotification returns false when the notification was already
 	// terminal, so only the first call gets true.
 	ActOnEndUserNotification(ctx context.Context, notificationUUID string) (bool, error)

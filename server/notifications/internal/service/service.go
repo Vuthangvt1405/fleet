@@ -63,6 +63,33 @@ func (s *Service) NotificationAwaitingDisplay(ctx context.Context, hostID uint, 
 	return notification, nil
 }
 
+func (s *Service) ListEndUserNotificationsByKind(ctx context.Context, kind string, limit int) ([]*api.EndUserNotification, error) {
+	notifications, err := s.ds.ListEndUserNotificationsByKind(ctx, kind, limit)
+	if err != nil {
+		return nil, ctxerr.Wrap(ctx, err, "list end user notifications by kind")
+	}
+	return notifications, nil
+}
+
+func (s *Service) ListPendingNotificationsForHost(ctx context.Context, hostID uint) ([]api.ListedNotification, error) {
+	notifications, err := s.ds.ListPendingEndUserNotificationsForHost(ctx, hostID)
+	if err != nil {
+		return nil, ctxerr.Wrap(ctx, err, "list pending end user notifications for host")
+	 }
+	return notifications, nil
+}
+
+func (s *Service) MarkNotificationDisplayed(ctx context.Context, hostID uint, notificationUUID string) error {
+	notification, err := s.notificationForHost(ctx, hostID, notificationUUID)
+	if err != nil {
+		return err
+	}
+	if err := s.ds.VerifyEndUserNotification(ctx, notification.UUID, time.Now().UTC()); err != nil {
+		return ctxerr.Wrap(ctx, err, "mark end user notification displayed")
+	}
+	return nil
+}
+
 func (s *Service) notificationForHost(ctx context.Context, hostID uint, notificationUUID string) (*api.EndUserNotification, error) {
 	notification, err := s.ds.GetEndUserNotificationByUUID(ctx, notificationUUID)
 	if err != nil {

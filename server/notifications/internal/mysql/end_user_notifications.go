@@ -208,6 +208,45 @@ LIMIT ?
 	return notifications, nil
 }
 
+// ListEndUserNotificationsByKind returns the newest notifications of a kind,
+// newest first, up to limit. Used for admin history views.
+func (ds *Datastore) ListEndUserNotificationsByKind(ctx context.Context, kind string, limit int) ([]*api.EndUserNotification, error) {
+	const listStmt = `
+SELECT ` + endUserNotificationColumns + `
+FROM notifications_end_user eun
+WHERE eun.kind = ?
+ORDER BY eun.id DESC
+LIMIT ?
+`
+
+	var notifications []*api.EndUserNotification
+	if err := sqlx.SelectContext(ctx, ds.reader(ctx), &notifications, listStmt, kind, limit); err != nil {
+		return nil, ctxerr.Wrap(ctx, err, "list end user notifications by kind")
+	}
+	return notifications, nil
+}
+
+// ListPendingEndUserNotificationsForHost returns the host's pending,
+// never-displayed, unexpired notifications, oldest first, for agent polling.
+func (ds *Datastore) ListPendingEndUserNotificationsForHost(ctx context.Context, hostID uint) ([]api.ListedNotification, error) {
+	const listStmt = `
+SELECT eun.uuid, eun.kind
+FROM notifications_end_user eun
+WHERE eun.host_id = ?
+	AND eun.status = ?
+	AND eun.displayed_at IS NULL
+	AND eun.expires_at > NOW(6)
+ORDER BY eun.id
+LIMIT 100
+`
+
+	var notifications []api.ListedNotification
+	if err := sqlx.SelectContext(ctx, ds.reader(ctx), &notifications, listStmt, hostID, api.EndUserNotificationPending); err != nil {
+		return nil, ctxerr.Wrap(ctx, err, "list pending end user notifications for host")
+	}
+	return notifications, nil
+}
+
 func (ds *Datastore) SetEndUserNotificationsDispatched(ctx context.Context, notifications []*api.EndUserNotification) error {
 	// last_reason is cleared because whatever stopped the previous attempt no
 	// longer describes this notification

@@ -187,6 +187,10 @@ type ListHostsInLabelFunc func(ctx context.Context, lid uint, opt fleet.HostList
 
 type ListLabelsForHostFunc func(ctx context.Context, hostID uint) ([]*fleet.Label, error)
 
+type SendMessageToHostFunc func(ctx context.Context, hostID uint, title, body string) (*fleet.MessageNotification, error)
+
+type ListMessageNotificationsFunc func(ctx context.Context) ([]*fleet.MessageNotification, error)
+
 type BatchValidateLabelsFunc func(ctx context.Context, teamID *uint, labelNames []string) (map[string]fleet.LabelIdent, error)
 
 type ApplyQuerySpecsFunc func(ctx context.Context, specs []*fleet.QuerySpec) error
@@ -1292,6 +1296,12 @@ type Service struct {
 
 	ListLabelsForHostFunc        ListLabelsForHostFunc
 	ListLabelsForHostFuncInvoked bool
+
+	SendMessageToHostFunc        SendMessageToHostFunc
+	SendMessageToHostFuncInvoked bool
+
+	ListMessageNotificationsFunc        ListMessageNotificationsFunc
+	ListMessageNotificationsFuncInvoked bool
 
 	BatchValidateLabelsFunc        BatchValidateLabelsFunc
 	BatchValidateLabelsFuncInvoked bool
@@ -3159,6 +3169,20 @@ func (s *Service) ListLabelsForHost(ctx context.Context, hostID uint) ([]*fleet.
 	s.ListLabelsForHostFuncInvoked = true
 	s.mu.Unlock()
 	return s.ListLabelsForHostFunc(ctx, hostID)
+}
+
+func (s *Service) SendMessageToHost(ctx context.Context, hostID uint, title, body string) (*fleet.MessageNotification, error) {
+	s.mu.Lock()
+	s.SendMessageToHostFuncInvoked = true
+	s.mu.Unlock()
+	return s.SendMessageToHostFunc(ctx, hostID, title, body)
+}
+
+func (s *Service) ListMessageNotifications(ctx context.Context) ([]*fleet.MessageNotification, error) {
+	s.mu.Lock()
+	s.ListMessageNotificationsFuncInvoked = true
+	s.mu.Unlock()
+	return s.ListMessageNotificationsFunc(ctx)
 }
 
 func (s *Service) BatchValidateLabels(ctx context.Context, teamID *uint, labelNames []string) (map[string]fleet.LabelIdent, error) {

@@ -24,6 +24,8 @@ type SetNotificationPayloadFunc func(ctx context.Context, notificationUUID strin
 
 type FailNotificationsForHostFunc func(ctx context.Context, hostID uint, reason string) error
 
+type ListEndUserNotificationsByKindFunc func(ctx context.Context, kind string, limit int) ([]*notifications_api.EndUserNotification, error)
+
 var NoopRecordOutcomeFunc RecordOutcomeFunc = func(_ context.Context, _ string, _ int64, _ string) error {
 	return nil
 }
@@ -59,6 +61,9 @@ type MockNotificationsService struct {
 
 	FailNotificationsForHostFunc        FailNotificationsForHostFunc
 	FailNotificationsForHostFuncInvoked bool
+
+	ListEndUserNotificationsByKindFunc        ListEndUserNotificationsByKindFunc
+	ListEndUserNotificationsByKindFuncInvoked bool
 
 	mu sync.Mutex
 }
@@ -135,6 +140,16 @@ func (m *MockNotificationsService) FailNotificationsForHost(ctx context.Context,
 		return nil
 	}
 	return m.FailNotificationsForHostFunc(ctx, hostID, reason)
+}
+
+func (m *MockNotificationsService) ListEndUserNotificationsByKind(ctx context.Context, kind string, limit int) ([]*notifications_api.EndUserNotification, error) {
+	m.mu.Lock()
+	m.ListEndUserNotificationsByKindFuncInvoked = true
+	m.mu.Unlock()
+	if m.ListEndUserNotificationsByKindFunc == nil {
+		return nil, nil
+	}
+	return m.ListEndUserNotificationsByKindFunc(ctx, kind, limit)
 }
 
 type notFoundError struct{}

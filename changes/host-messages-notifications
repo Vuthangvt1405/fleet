@@ -1,0 +1,1 @@
+- Added a Messages page and `GET`/`POST /api/v1/fleet/messages` endpoints to send messages to a host's end user and review send history, backed by end-user notifications. Included `cvss_score` in the Free-tier vulnerability webhook payload.

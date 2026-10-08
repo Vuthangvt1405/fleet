@@ -35,6 +35,21 @@ func (s *Service) ExpireAndQueueNotifications(ctx context.Context) error {
 			return nil
 		}
 
+		// Kinds the agent polls for directly (e.g. desktop toasts) are never
+		// queued: their rows stay pending for the agent to pick up, and
+		// expire if it never does.
+		scriptNotifications := notifications[:0]
+		for _, notification := range notifications {
+			kind, kindRegistered := s.kinds[notification.Kind]
+			if !kindRegistered || kind.DeliversViaScript() {
+				scriptNotifications = append(scriptNotifications, notification)
+			}
+		}
+		if len(scriptNotifications) == 0 {
+			return nil
+		}
+		notifications = scriptNotifications
+
 		hostIDs := make([]uint, 0, len(notifications))
 		for _, notification := range notifications {
 			hostIDs = append(hostIDs, notification.HostID)

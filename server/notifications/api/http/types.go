@@ -40,3 +40,35 @@ type NotificationActionResponse struct {
 }
 
 func (r NotificationActionResponse) Error() error { return r.Err }
+
+type ListNotificationsRequest struct {
+	Token string `url:"token"`
+}
+
+// DeviceAuthToken is where the device auth middleware reads the token from.
+func (r *ListNotificationsRequest) DeviceAuthToken() string {
+	return r.Token
+}
+
+type ListNotificationsResponse struct {
+	Notifications []api.ListedNotification `json:"notifications"`
+	Err           error                    `json:"error,omitempty"`
+}
+
+func (r ListNotificationsResponse) Error() error { return r.Err }
+
+type MarkNotificationDisplayedRequest struct {
+	Token string `url:"token"`
+	UUID  string `url:"uuid"`
+}
+
+// DeviceAuthToken is where the device auth middleware reads the token from.
+func (r *MarkNotificationDisplayedRequest) DeviceAuthToken() string {
+	return r.Token
+}
+
+type MarkNotificationDisplayedResponse struct {
+	Err error `json:"error,omitempty"`
+}
+
+func (r MarkNotificationDisplayedResponse) Error() error { return r.Err }

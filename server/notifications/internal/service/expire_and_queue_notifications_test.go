@@ -97,6 +97,14 @@ func (m *mockDatastore) GetNotificationAwaitingDisplay(context.Context, uint, st
 	return nil, nil
 }
 
+func (m *mockDatastore) ListEndUserNotificationsByKind(context.Context, string, int) ([]*api.EndUserNotification, error) {
+	return nil, nil
+}
+
+func (m *mockDatastore) ListPendingEndUserNotificationsForHost(context.Context, uint) ([]api.ListedNotification, error) {
+	return nil, nil
+}
+
 // mockScriptQueue returns the execution IDs it was built with, so a test can
 // leave a host out.
 type mockScriptQueue struct {
@@ -144,4 +152,45 @@ func TestExpireAndQueueNotifications(t *testing.T) {
 		// leaving a notification pointing at a script that doesn't exist
 		assert.Empty(t, ds.dispatched)
 	})
+
+	t.Run("kinds the agent polls for are never queued", func(t *testing.T) {
+		ds := &mockDatastore{due: []*api.EndUserNotification{
+			{UUID: "notification-a", HostID: 1, Kind: "polled"},
+		}}
+		queue := &mockScriptQueue{executionIDByHost: map[uint]string{}}
+		svc := NewService(ds, queue, logger)
+		svc.RegisterKind(polledKind{})
+
+		require.NoError(t, svc.ExpireAndQueueNotifications(ctx))
+
+		assert.Empty(t, ds.dispatched)
+		assert.Empty(t, ds.deferred)
+	})
 }
+
+// polledKind is a kind the agent polls for directly, so dispatch leaves it pending.
+type polledKind struct{}
+
+func (polledKind) Name() string { return "polled" }
+
+func (polledKind) Render(context.Context, *api.EndUserNotification) (*api.NotificationView, error) {
+	return nil, nil
+}
+
+func (polledKind) OnVerify(context.Context, *api.EndUserNotification, time.Time) error {
+	return nil
+}
+
+func (polledKind) OnDelay(context.Context, *api.EndUserNotification) (*api.NotificationView, error) {
+	return nil, nil
+}
+
+func (polledKind) OnAction(context.Context, *api.EndUserNotification, string) (*api.NotificationView, error) {
+	return nil, nil
+}
+
+func (polledKind) OnOutcome(context.Context, *api.EndUserNotification, api.NotificationOutcome) error {
+	return nil
+}
+
+func (polledKind) DeliversViaScript() bool { return false }

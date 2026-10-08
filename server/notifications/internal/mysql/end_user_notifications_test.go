@@ -23,6 +23,8 @@ func TestEndUserNotifications(t *testing.T) {
 		{"AwaitingDisplay", testGetNotificationAwaitingDisplay},
 		{"AwaitingDisplayScope", testGetNotificationAwaitingDisplayScope},
 		{"ListToDispatch", testListEndUserNotificationsToDispatch},
+		{"ListByKind", testListEndUserNotificationsByKind},
+		{"ListPendingForHost", testListPendingEndUserNotificationsForHost},
 		{"SetDispatched", testSetEndUserNotificationsDispatched},
 		{"DeferForHosts", testDeferEndUserNotificationsForHosts},
 		{"Expire", testExpireEndUserNotifications},
@@ -273,6 +275,68 @@ func testNewAndGetEndUserNotification(t *testing.T, env *testEnv) {
 
 	_, err = env.ds.GetEndUserNotificationByExecutionID(ctx, "no-such-execution-id")
 	assert.True(t, platform_errors.IsNotFound(err))
+}
+
+func testListEndUserNotificationsByKind(t *testing.T, env *testEnv) {
+	ctx := t.Context()
+
+	t.Run("newest first across hosts", func(t *testing.T) {
+		defer env.TruncateTables(t)
+		hostID := newDarwinHost(t, env, "by-kind-one", true)
+		otherID := newDarwinHost(t, env, "by-kind-two", true)
+		first := env.InsertNotification(t, hostID, "message", nil, nil)
+		second := env.InsertNotification(t, otherID, "message", nil, nil)
+		env.InsertNotification(t, hostID, "patch", nil, nil)
+
+		due, err := env.ds.ListEndUserNotificationsByKind(ctx, "message", 100)
+		require.NoError(t, err)
+		require.Len(t, due, 2)
+		assert.Equal(t, second, due[0].UUID)
+		assert.Equal(t, first, due[1].UUID)
+	})
+
+	t.Run("limit applies", func(t *testing.T) {
+		defer env.TruncateTables(t)
+		hostID := newDarwinHost(t, env, "by-kind-limit", true)
+		env.InsertNotification(t, hostID, "message", nil, nil)
+		env.InsertNotification(t, hostID, "message", nil, nil)
+
+		due, err := env.ds.ListEndUserNotificationsByKind(ctx, "message", 1)
+		require.NoError(t, err)
+		require.Len(t, due, 1)
+	})
+}
+
+func testListPendingEndUserNotificationsForHost(t *testing.T, env *testEnv) {
+	ctx := t.Context()
+
+	t.Run("pending undisplayed only, oldest first", func(t *testing.T) {
+		defer env.TruncateTables(t)
+		hostID := newDarwinHost(t, env, "pending-for-host", true)
+		otherID := newDarwinHost(t, env, "pending-for-host-other", true)
+		first := env.InsertNotification(t, hostID, "message", nil, nil)
+		second := env.InsertNotification(t, hostID, "patch", nil, nil)
+		env.InsertNotification(t, otherID, "message", nil, nil)
+
+		due, err := env.ds.ListPendingEndUserNotificationsForHost(ctx, hostID)
+		require.NoError(t, err)
+		require.Len(t, due, 2)
+		assert.Equal(t, first, due[0].UUID)
+		assert.Equal(t, "message", due[0].Kind)
+		assert.Equal(t, second, due[1].UUID)
+		assert.Equal(t, "patch", due[1].Kind)
+	})
+
+	t.Run("displayed excluded", func(t *testing.T) {
+		defer env.TruncateTables(t)
+		hostID := newDarwinHost(t, env, "pending-displayed", true)
+		uuid := env.InsertNotification(t, hostID, "message", nil, nil)
+		require.NoError(t, env.ds.VerifyEndUserNotification(ctx, uuid, time.Now().UTC()))
+
+		due, err := env.ds.ListPendingEndUserNotificationsForHost(ctx, hostID)
+		require.NoError(t, err)
+		assert.Empty(t, due)
+	})
 }
 
 func testListEndUserNotificationsToDispatch(t *testing.T, env *testEnv) {

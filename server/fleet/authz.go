@@ -21,6 +21,10 @@ const (
 	// permitted for technicians, who otherwise have no write access to hosts.
 	ActionDeleteHost    = "delete_host"
 	ActionClearPasscode = "clear_passcode"
+	// ActionSendMessage refers to sending a message to a host's end user
+	// (Messages page). Like ActionTransferHost, it is permitted for
+	// technicians, who otherwise have no write access to hosts.
+	ActionSendMessage = "send_message"
 	// ActionRotateDiskEncryptionKey refers to rotating a host's disk encryption key. It is narrower than writing MDM
 	// commands, which gitops is also granted.
 	ActionRotateDiskEncryptionKey = "rotate_disk_encryption_key"

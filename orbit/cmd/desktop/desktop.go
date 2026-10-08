@@ -345,6 +345,7 @@ func main() {
 				pingErrCount            = 0
 				lastDesktopSummaryCheck time.Time
 				pinToast                *bitLockerPINToast
+				messagesToast           *messageToast
 			)
 			if runtime.GOOS == "windows" {
 				// The marker keeps track of the toast notification across Fleet Desktop restarts.
@@ -359,6 +360,7 @@ func main() {
 					log.Warn().Err(err).Msg("identify the Windows login for the BitLocker PIN toast")
 				}
 				pinToast = newBitLockerPINToast(markerPath, loginID)
+				messagesToast = newMessageToast(client, tokenReader.GetCached)
 			}
 
 			for {
@@ -381,6 +383,11 @@ func main() {
 
 				// Successfully connected to Fleet.
 				pingErrCount = 0
+
+				if runtime.GOOS == "windows" {
+					// Polls at most every messagePollInterval; cheap when empty.
+					messagesToast.poll()
+				}
 
 				// Check if we need to fetch the "Fleet desktop" summary from Fleet.
 				if !menuManager.IsOfflineIndicatorDisplayed() &&

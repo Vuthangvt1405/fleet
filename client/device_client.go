@@ -278,3 +278,64 @@ func uintValueOrZero(v *uint) uint {
 	}
 	return *v
 }
+
+// DeviceNotificationSummary is a pending notification for this host. The
+// definition is duplicated for now (orbit should not depend server/service).
+type DeviceNotificationSummary struct {
+	UUID string `json:"uuid"`
+	Kind string `json:"kind"`
+}
+
+// DeviceNotificationAction is an action the end user can take on a notification.
+type DeviceNotificationAction struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// DeviceNotificationView is the rendered notification for this host.
+type DeviceNotificationView struct {
+	UUID        string                     `json:"uuid"`
+	Title       string                     `json:"title"`
+	Description string                     `json:"description"`
+	Actions     []DeviceNotificationAction `json:"actions"`
+}
+
+type listDeviceNotificationsResponse struct {
+	Err           error                       `json:"error,omitempty"`
+	Notifications []DeviceNotificationSummary `json:"notifications"`
+}
+
+func (r listDeviceNotificationsResponse) Error() error { return r.Err }
+
+// ListNotifications returns this host's pending, never-displayed notifications.
+func (dc *DeviceClient) ListNotifications(token string) ([]DeviceNotificationSummary, error) {
+	verb, path := "GET", "/api/latest/fleet/device/%s/notifications"
+	var responseBody listDeviceNotificationsResponse
+	if err := dc.request(verb, path, token, "", nil, &responseBody); err != nil {
+		return nil, err
+	}
+	return responseBody.Notifications, nil
+}
+
+type getDeviceNotificationResponse struct {
+	Err error `json:"error,omitempty"`
+	DeviceNotificationView
+}
+
+func (r getDeviceNotificationResponse) Error() error { return r.Err }
+
+// GetNotificationView returns the rendered view of one of this host's notifications.
+func (dc *DeviceClient) GetNotificationView(token, uuid string) (*DeviceNotificationView, error) {
+	verb, path := "GET", "/api/latest/fleet/device/%s/notifications/"+uuid
+	var responseBody getDeviceNotificationResponse
+	if err := dc.request(verb, path, token, "", nil, &responseBody); err != nil {
+		return nil, err
+	}
+	return &responseBody.DeviceNotificationView, nil
+}
+
+// MarkNotificationDisplayed records that a notification reached this host's end user.
+func (dc *DeviceClient) MarkNotificationDisplayed(token, uuid string) error {
+	verb, path := "POST", "/api/latest/fleet/device/%s/notifications/"+uuid+"/displayed"
+	return dc.request(verb, path, token, "", map[string]any{}, nil)
+}

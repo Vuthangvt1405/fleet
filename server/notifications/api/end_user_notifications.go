@@ -121,6 +121,13 @@ type NotificationOutcome struct {
 	ExecutionID string
 }
 
+// ListedNotification is a pending notification for a host. The agent
+// fetches the full view per UUID and toasts the kinds it handles.
+type ListedNotification struct {
+	UUID string `json:"uuid" db:"uuid"`
+	Kind string `json:"kind" db:"kind"`
+}
+
 // NotificationKind owns what a notification's payload means and what happens
 // when an end user acts on it or an attempt ends. Core owns delivery. Kinds
 // are implemented in server/service and registered with RegisterKind, since a
@@ -142,4 +149,8 @@ type NotificationKind interface {
 	OnAction(ctx context.Context, notification *EndUserNotification, actionID string) (*NotificationView, error)
 	// OnOutcome runs after Fleet records how an attempt ended.
 	OnOutcome(ctx context.Context, notification *EndUserNotification, outcome NotificationOutcome) error
+	// DeliversViaScript reports whether the dispatch loop queues the shared
+	// notification script for this kind. Kinds the agent polls for directly
+	// (e.g. desktop toasts) return false, so their rows are never queued.
+	DeliversViaScript() bool
 }

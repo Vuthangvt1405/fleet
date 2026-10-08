@@ -18,6 +18,7 @@ write_host_label := "write_host_label"
 cancel_host_activity := "cancel_host_activity"
 transfer_host := "transfer_host"
 delete_host := "delete_host"
+send_message := "send_message"
 clear_passcode := "clear_passcode"
 rotate_disk_encryption_key := "rotate_disk_encryption_key"
 resend := "resend" # only for profiles, and to a single host
@@ -422,6 +423,20 @@ allow {
 	object.type == "host"
 	team_role(subject, object.team_id) == [admin, maintainer, technician, gitops][_]
 	action == delete_host
+}
+
+# Global admins, maintainers, technicians, and gitops can send messages to hosts.
+allow {
+	object.type == "host"
+	subject.global_role == [admin, maintainer, technician, gitops][_]
+	action == send_message
+}
+
+# Team admins, maintainers, technicians, and gitops can send messages to hosts of their own team.
+allow {
+	object.type == "host"
+	team_role(subject, object.team_id) == [admin, maintainer, technician, gitops][_]
+	action == send_message
 }
 
 # Team admins and maintainers can cancel activities on a host of their own team.

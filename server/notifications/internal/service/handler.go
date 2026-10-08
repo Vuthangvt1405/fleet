@@ -32,11 +32,15 @@ func attachFleetAPIRoutes(r *mux.Router, svc api.Service, authMiddleware endpoin
 
 	de.GET("/api/_version_/fleet/device/{token}/notifications/{uuid}", getNotificationEndpoint, api_http.GetNotificationRequest{})
 	de.POST("/api/_version_/fleet/device/{token}/notifications/{uuid}/actions", notificationActionEndpoint, api_http.NotificationActionRequest{})
+	de.GET("/api/_version_/fleet/device/{token}/notifications", listNotificationsEndpoint, api_http.ListNotificationsRequest{})
+	de.POST("/api/_version_/fleet/device/{token}/notifications/{uuid}/displayed", markNotificationDisplayedEndpoint, api_http.MarkNotificationDisplayedRequest{})
 }
 
 func RegisterTracingTiers(registry *tracing.Registry) {
 	registry.Register(http.MethodGet, "/api/_version_/fleet/device/{token}/notifications/{uuid}", tracing.TierStandard)
 	registry.Register(http.MethodPost, "/api/_version_/fleet/device/{token}/notifications/{uuid}/actions", tracing.TierStandard)
+	registry.Register(http.MethodGet, "/api/_version_/fleet/device/{token}/notifications", tracing.TierStandard)
+	registry.Register(http.MethodPost, "/api/_version_/fleet/device/{token}/notifications/{uuid}/displayed", tracing.TierStandard)
 }
 
 func apiVersions() []string {
@@ -71,4 +75,31 @@ func notificationActionEndpoint(ctx context.Context, request any, svc api.Servic
 		return api_http.NotificationActionResponse{Err: err}
 	}
 	return api_http.NotificationActionResponse{NotificationView: view}
+}
+
+func listNotificationsEndpoint(ctx context.Context, request any, svc api.Service) platform_http.Errorer {
+	hostID, ok := notifications.HostIDFromContext(ctx)
+	if !ok {
+		return api_http.ListNotificationsResponse{Err: errMissingHost}
+	}
+
+	listed, err := svc.ListPendingNotificationsForHost(ctx, hostID)
+	if err != nil {
+		return api_http.ListNotificationsResponse{Err: err}
+	}
+	return api_http.ListNotificationsResponse{Notifications: listed}
+}
+
+func markNotificationDisplayedEndpoint(ctx context.Context, request any, svc api.Service) platform_http.Errorer {
+	req := request.(*api_http.MarkNotificationDisplayedRequest)
+
+	hostID, ok := notifications.HostIDFromContext(ctx)
+	if !ok {
+		return api_http.MarkNotificationDisplayedResponse{Err: errMissingHost}
+	}
+
+	if err := svc.MarkNotificationDisplayed(ctx, hostID, req.UUID); err != nil {
+		return api_http.MarkNotificationDisplayedResponse{Err: err}
+	}
+	return api_http.MarkNotificationDisplayedResponse{}
 }
