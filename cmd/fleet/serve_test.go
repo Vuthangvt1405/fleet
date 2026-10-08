@@ -659,16 +659,20 @@ func TestScanVulnerabilitiesFreeTier(t *testing.T) {
 		err := json.NewDecoder(r.Body).Decode(&payload)
 		require.NoError(t, err)
 
-		// Free tier payload
+		// Free tier payload includes cvss_score but not other premium fields.
 		var vuln map[string]json.RawMessage
 		require.NoError(t, json.Unmarshal(payload["vulnerability"], &vuln))
 		require.NotContains(t, vuln, "epss_probability")
-		require.NotContains(t, vuln, "cvss_score")
+		require.Contains(t, vuln, "cvss_score")
 		require.NotContains(t, vuln, "cisa_known_exploit")
 		require.NotContains(t, vuln, "cve_published")
 		require.Contains(t, vuln, "cve")
 		require.Contains(t, vuln, "details_link")
 		require.Contains(t, vuln, "hosts_affected")
+
+		var cvss float64
+		require.NoError(t, json.Unmarshal(vuln["cvss_score"], &cvss))
+		require.Equal(t, 5.4, cvss)
 
 		var cve string
 		require.NoError(t, json.Unmarshal(vuln["cve"], &cve))
@@ -787,8 +791,17 @@ func TestScanVulnerabilitiesFreeTier(t *testing.T) {
 		return nil
 	}
 	ds.ListCVEsFunc = func(ctx context.Context, maxAge time.Duration) ([]fleet.CVEMeta, error) {
-		t.Error("ListCVEs should not be called on free tier")
-		return nil, nil
+		published := time.Date(2022, time.October, 26, 14, 15, 0, 0, time.UTC)
+
+		return []fleet.CVEMeta{
+			{
+				CVE:              "CVE-2022-39348",
+				CVSSScore:        ptr.Float64(5.4),
+				EPSSProbability:  ptr.Float64(0.0089),
+				CISAKnownExploit: ptr.Bool(false),
+				Published:        &published,
+			},
+		}, nil
 	}
 	ds.HostVulnSummariesBySoftwareIDsFunc = func(ctx context.Context, softwareIDs []uint) ([]fleet.HostVulnerabilitySummary, error) {
 		return []fleet.HostVulnerabilitySummary{

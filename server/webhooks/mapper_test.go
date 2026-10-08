@@ -29,11 +29,11 @@ func TestGetPaylaod(t *testing.T) {
 
 	sut := Mapper{}
 
-	t.Run("does not include EE features", func(t *testing.T) {
+	t.Run("includes CVSS but not other EE features", func(t *testing.T) {
 		result := sut.GetPayload(serverURL, nil, vuln.CVE, meta)
 		require.Empty(t, result.CISAKnownExploit)
 		require.Empty(t, result.EPSSProbability)
-		require.Empty(t, result.CVSSScore)
+		require.Equal(t, *meta.CVSSScore, *result.CVSSScore)
 		require.Empty(t, result.CVEPublished)
 	})
 
