@@ -85,6 +85,7 @@ describe("CommandPalette helpers", () => {
       expect(ids).toContain("software-page");
       expect(ids).toContain("reports");
       expect(ids).toContain("policies");
+      expect(ids).toContain("messages");
       expect(ids).toContain("settings-page");
     });
 

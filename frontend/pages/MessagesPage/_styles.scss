@@ -1,0 +1,42 @@
+.manage-messages-page {
+  // Opt out of MainContent's `overflow: auto` so dropdowns can spill below
+  // the page without a second scrollbar. Matches `.manage-labels-page`.
+  overflow: visible;
+
+  @include vertical-page-layout;
+
+  &__header-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: $pad-large;
+  }
+
+  &__header {
+    @include normalize-team-header;
+  }
+
+  &__text {
+    margin-right: $pad-large;
+  }
+
+  &__title {
+    h1 {
+      margin: 0;
+    }
+  }
+
+  &__action-button-container {
+    display: flex;
+    align-items: center;
+  }
+
+  &__send-form {
+    background-color: $core-fleet-white;
+    border: 1px solid $ui-gray;
+    border-radius: $border-radius-large;
+    padding: $pad-large;
+    display: flex;
+    flex-direction: column;
+    gap: $pad-medium;
+  }
+}

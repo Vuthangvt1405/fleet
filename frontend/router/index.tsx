@@ -318,6 +318,9 @@ const LazyManagePoliciesPage = lazyPage(
       /* webpackChunkName: "policies" */ "pages/policies/ManagePoliciesPage"
     )
 );
+const LazyManageMessagesPage = lazyPage(
+  () => import(/* webpackChunkName: "messages" */ "pages/MessagesPage")
+);
 const LazyManageLabelsPage = lazyPage(
   () => import(/* webpackChunkName: "labels" */ "pages/labels/ManageLabelsPage")
 );
@@ -827,6 +830,7 @@ const routes = (
               <Route path="live" component={LazyLivePolicyPage} />
             </Route>
           </Route>
+          <Route path="messages" component={LazyManageMessagesPage} />
           <Redirect from="profile" to="account" /> {/* deprecated URL */}
           <Route path="account" component={AccountPage} />
         </Route>

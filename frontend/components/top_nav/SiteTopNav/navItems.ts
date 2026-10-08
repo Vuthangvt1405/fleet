@@ -99,6 +99,13 @@ export default (
       },
       withParams: { type: "query", names: ["fleet_id"] },
     },
+    {
+      name: "Messages",
+      location: {
+        regex: new RegExp(`^${URL_PREFIX}/messages`),
+        pathname: PATHS.MANAGE_MESSAGES,
+      },
+    },
   ];
 
   if (isNoAccess) {

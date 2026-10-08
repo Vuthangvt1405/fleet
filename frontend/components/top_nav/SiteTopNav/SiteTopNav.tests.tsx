@@ -41,6 +41,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
   });
 
   it("renders correct navigation for free global maintainer", () => {
@@ -71,6 +72,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
   });
 
   it("renders correct navigation for free global observer", () => {
@@ -99,6 +101,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
 
     expect(screen.queryByText(/controls/i)).not.toBeInTheDocument();
   });
@@ -128,6 +131,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
   });
 
   it("renders correct navigation for premium global maintainer", () => {
@@ -158,6 +162,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
   });
 
   it("renders correct navigation for premium global observer", () => {
@@ -186,6 +191,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
 
     expect(screen.queryByText(/controls/i)).not.toBeInTheDocument();
   });
@@ -218,6 +224,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
   });
 
   it("renders correct navigation for premium team maintainer", () => {
@@ -248,6 +255,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
   });
 
   it("renders correct navigation for premium team observer", () => {
@@ -276,6 +284,7 @@ describe("SiteTopNav - component", () => {
     expect(screen.getByText(/software/i)).toBeInTheDocument();
     expect(screen.getByText(/reports/i)).toBeInTheDocument();
     expect(screen.getByText(/policies/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages/i)).toBeInTheDocument();
 
     expect(screen.queryByText(/controls/i)).not.toBeInTheDocument();
   });

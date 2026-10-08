@@ -33,6 +33,10 @@ export default [
     path: PATHS.MANAGE_POLICIES,
     title: `Policies | ${DOCUMENT_TITLE_SUFFIX}`,
   },
+  {
+    path: PATHS.MANAGE_MESSAGES,
+    title: `Messages | ${DOCUMENT_TITLE_SUFFIX}`,
+  },
   { path: PATHS.NEW_POLICY, title: `New policy | ${DOCUMENT_TITLE_SUFFIX}` },
   {
     path: PATHS.ADMIN_SETTINGS,

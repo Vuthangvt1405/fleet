@@ -107,6 +107,13 @@ const buildPagesItems = (
         "sql",
       ],
     },
+    {
+      id: "messages",
+      label: "Messages",
+      group: "Pages" as const,
+      path: paths.MANAGE_MESSAGES,
+      keywords: ["message", "notify", "toast", "host", "send"],
+    },
     ...(canAccessSettings
       ? [
           {

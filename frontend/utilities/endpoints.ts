@@ -150,6 +150,9 @@ export default {
   LABELS: `/${API_VERSION}/fleet/labels`,
   LABELS_SUMMARY: `/${API_VERSION}/fleet/labels/summary`,
 
+  // host messages (send + history)
+  MESSAGES: `/${API_VERSION}/fleet/messages`,
+
   // self-service categories
   SELF_SERVICE_CATEGORIES: `/${API_VERSION}/fleet/software/self_service_categories`,
   SELF_SERVICE_CATEGORY: (id: number) =>
