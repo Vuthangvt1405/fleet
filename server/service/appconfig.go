@@ -758,6 +758,23 @@ func (svc *Service) ModifyAppConfig(ctx context.Context, p []byte, applyOpts fle
 			}
 		}
 	}
+	if incoming := newAppConfig.Integrations.PacketFence; incoming != nil {
+		stored := oldAppConfig.Integrations.PacketFence
+		merged := appConfig.Integrations.PacketFence
+		if merged != nil && (incoming.Password == "" || incoming.Password == fleet.MaskedPassword) {
+			if stored != nil && merged.BaseURL == stored.BaseURL && merged.Username == stored.Username {
+				merged.Password = stored.Password
+			} else {
+				invalid.Append("integrations.packetfence.password", "a new password is required when changing the URL or username")
+			}
+			if stored == nil || stored.Password == "" {
+				invalid.Append("integrations.packetfence.password", "a password has not been configured")
+			}
+		}
+		if !lic.IsPremium() && merged != nil && merged.Enabled {
+			invalid.Append("integrations.packetfence", ErrMissingLicense.Error())
+		}
+	}
 
 	// if turning off Windows MDM and Windows Migration is not explicitly set to
 	// on in the same update, set it to off (otherwise, if it is explicitly set
@@ -1089,6 +1106,7 @@ func (svc *Service) ModifyAppConfig(ctx context.Context, p []byte, applyOpts fle
 
 	fleet.ValidateGoogleCalendarIntegrations(appConfig.Integrations.GoogleCalendar, invalid)
 	fleet.ValidateGoogleWorkspaceIntegrations(appConfig.Integrations.GoogleWorkspace, invalid)
+	fleet.ValidatePacketFenceIntegration(appConfig.Integrations.PacketFence, invalid)
 	fleet.ValidateCertIdPIntrospectionAllowlists(&appConfig.Integrations, invalid)
 	fleet.ValidateEnabledVulnerabilitiesIntegrations(appConfig.WebhookSettings.VulnerabilitiesWebhook, appConfig.Integrations, invalid)
 	fleet.ValidateEnabledFailingPoliciesIntegrations(appConfig.WebhookSettings.FailingPoliciesWebhook, appConfig.Integrations, invalid)

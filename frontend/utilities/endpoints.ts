@@ -22,6 +22,7 @@ export default {
   CONDITIONAL_ACCESS_IDP_APPLE_PROFILE: `/${API_VERSION}/fleet/conditional_access/idp/apple/profile`,
 
   CONFIG: `/${API_VERSION}/fleet/config`,
+  PACKETFENCE_TEST_CONNECTION: `/${API_VERSION}/fleet/integrations/packetfence/test`,
   CONFIRM_EMAIL_CHANGE: (token: string): string => {
     return `/${API_VERSION}/fleet/email/change/${token}`;
   },

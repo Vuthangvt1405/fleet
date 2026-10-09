@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -68,41 +66,21 @@ type Config struct {
 	ReevaluateAfterClose bool
 }
 
-// ConfigFromEnv loads v1 revocation settings from the environment. The cron
-// stays disabled unless endpoint and credentials are all present.
-func ConfigFromEnv() Config {
-	managed := strings.Split(os.Getenv("FLEET_PACKETFENCE_MANAGED_EVENT_TYPES"), ",")
-	var types []string
-	for _, t := range managed {
-		if t = strings.TrimSpace(t); t != "" {
-			types = append(types, t)
-		}
+// ConfigFromAppConfig maps persisted UI settings to the revocation worker.
+// An incomplete or unowned configuration always remains disabled.
+func ConfigFromAppConfig(p *fleet.PacketFenceIntegration) Config {
+	if p == nil {
+		return Config{}
 	}
-	if len(types) == 0 {
-		types = []string{"3500001", "3500002", "3500003"}
-	}
-	policyChecks := DefaultPolicyCleanChecks
-	if v, err := strconv.Atoi(os.Getenv("FLEET_PACKETFENCE_POLICY_CHECKS")); err == nil && v > 0 {
-		policyChecks = v
-	}
-	cveChecks := DefaultCVECleanChecks
-	if v, err := strconv.Atoi(os.Getenv("FLEET_PACKETFENCE_CVE_CHECKS")); err == nil && v > 0 {
-		cveChecks = v
-	}
-	base, user, pass := os.Getenv("FLEET_PACKETFENCE_BASE_URL"), os.Getenv("FLEET_PACKETFENCE_USERNAME"), os.Getenv("FLEET_PACKETFENCE_PASSWORD")
+	invalid := &fleet.InvalidArgumentError{}
+	fleet.ValidatePacketFenceIntegration(p, invalid)
 	return Config{
-		Enabled:                   base != "" && user != "" && pass != "",
-		BaseURL:                   base,
-		Username:                  user,
-		Password:                  pass,
-		CAFile:                    os.Getenv("FLEET_PACKETFENCE_CA_FILE"),
-		ManagedEventTypes:         types,
-		RequireExclusiveOwnership: os.Getenv("FLEET_PACKETFENCE_REQUIRE_EXCLUSIVE_OWNERSHIP") != "false",
-		PolicyChecksRequired:      policyChecks,
-		CVEChecksRequired:         cveChecks,
-		PollLimit:                 DefaultPollLimit,
-		RetryBackoff:              DefaultRetryBackoff,
-		DryRun:                    os.Getenv("FLEET_PACKETFENCE_DRY_RUN") == "true",
+		Enabled: p.Enabled && !invalid.HasErrors() && p.BaseURL != "" && p.Username != "" && p.Password != "" &&
+			p.RequireExclusiveOwnership && len(p.ManagedEventTypes) > 0 && p.PolicyChecksRequired >= 2 && p.CVEChecksRequired >= 1,
+		BaseURL: p.BaseURL, Username: p.Username, Password: p.Password,
+		ManagedEventTypes: p.ManagedEventTypes, RequireExclusiveOwnership: p.RequireExclusiveOwnership,
+		PolicyChecksRequired: p.PolicyChecksRequired, CVEChecksRequired: p.CVEChecksRequired,
+		PollLimit: DefaultPollLimit, RetryBackoff: DefaultRetryBackoff, DryRun: p.DryRun,
 	}
 }
 
