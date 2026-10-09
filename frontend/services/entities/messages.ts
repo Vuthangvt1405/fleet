@@ -1,6 +1,6 @@
 import {
   IMessagesResponse,
-  ISendMessageFormData,
+  ISendSingleMessageRequest,
   ISendMessageResponse,
 } from "interfaces/message";
 import sendRequest from "services";
@@ -14,7 +14,9 @@ export default {
   },
 
   /** Queue a message for a host. The agent shows it as a Windows toast. */
-  send: (formData: ISendMessageFormData): Promise<ISendMessageResponse> => {
+  send: (
+    formData: ISendSingleMessageRequest
+  ): Promise<ISendMessageResponse> => {
     const { MESSAGES } = endpoints;
     return sendRequest("POST", MESSAGES, {
       host_id: formData.host_id,

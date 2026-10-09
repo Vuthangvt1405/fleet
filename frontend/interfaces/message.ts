@@ -41,8 +41,15 @@ export interface ISendMessageResponse {
   message: IMessage;
 }
 
-/** Form data for the send-message modal. Host is preselected, title + body only. */
+/** Form data for composing a message for one or more hosts. */
 export interface ISendMessageFormData {
+  host_ids: number[];
+  title: string;
+  body: string;
+}
+
+/** Request body for sending one message to one host. */
+export interface ISendSingleMessageRequest {
   host_id: number;
   title: string;
   body: string;
