@@ -628,6 +628,7 @@ var hostRefs = []string{
 	"host_autopilot_devices",
 	"host_one_time_enroll_secrets",
 	"notifications_end_user",
+	"pf_revocation_ledger",
 }
 
 // NOTE: The following tables are explicity excluded from hostRefs list and accordingly are not

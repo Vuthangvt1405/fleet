@@ -23,6 +23,14 @@ type Datastore interface {
 	ExpireEndUserNotifications(ctx context.Context) (int64, error)
 	DeleteExpiredEndUserNotifications(ctx context.Context, olderThan time.Time, limit int) (int64, error)
 	VerifyEndUserNotification(ctx context.Context, notificationUUID string, displayedAt time.Time) error
+	// MarkEndUserNotificationDisplayed records the first time an
+	// agent-reported notification reached its end user, and moves it out of
+	// the pending set so the agent stops polling for it. Unlike
+	// VerifyEndUserNotification, which only matches dispatched rows, it
+	// matches that host's pending rows too, so agents that poll for
+	// notifications directly (rather than running a dispatched script) can
+	// report display.
+	MarkEndUserNotificationDisplayed(ctx context.Context, notificationUUID string, hostID uint, displayedAt time.Time) error
 	DelayEndUserNotification(ctx context.Context, notificationUUID string, nextAttemptAt time.Time, payload json.RawMessage) error
 	// ListEndUserNotificationsByKind returns the newest notifications of a
 	// kind, newest first, up to limit. Used for admin history views.

@@ -84,7 +84,10 @@ func (s *Service) MarkNotificationDisplayed(ctx context.Context, hostID uint, no
 	if err != nil {
 		return err
 	}
-	if err := s.ds.VerifyEndUserNotification(ctx, notification.UUID, time.Now().UTC()); err != nil {
+	// VerifyEndUserNotification only matches dispatched rows, which polled
+	// kinds (e.g. messages) never become, so acking through it is a silent
+	// no-op and the agent keeps polling for the row.
+	if err := s.ds.MarkEndUserNotificationDisplayed(ctx, notification.UUID, hostID, time.Now().UTC()); err != nil {
 		return ctxerr.Wrap(ctx, err, "mark end user notification displayed")
 	}
 	return nil

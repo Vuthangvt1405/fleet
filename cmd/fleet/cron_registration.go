@@ -23,6 +23,7 @@ import (
 	"github.com/fleetdm/fleet/v4/server/microsoft/msgraph"
 	notifications_api "github.com/fleetdm/fleet/v4/server/notifications/api"
 	"github.com/fleetdm/fleet/v4/server/service"
+	"github.com/fleetdm/fleet/v4/server/service/packetfence"
 	"github.com/fleetdm/fleet/v4/server/service/redis_key_value"
 	"github.com/fleetdm/fleet/v4/server/service/schedule"
 )
@@ -441,6 +442,17 @@ func registerMiscCrons(ctx context.Context, deps cronSchedulesDeps) {
 	deps.register("failed to register batch activity completion checker schedule", func() (fleet.CronSchedule, error) {
 		return newBatchActivityCompletionCheckerSchedule(ctx, deps.instanceID, deps.ds, deps.logger)
 	})
+
+	// Start PacketFence event revocation reconciliation only when the
+	// PacketFence connection is configured; otherwise skip with a log line
+	// (same pattern as FLEET_SKIP_CHART_DATA_COLLECTION above).
+	if pfCfg := packetfence.ConfigFromEnv(); pfCfg.Enabled {
+		deps.register("failed to register packetfence revocation schedule", func() (fleet.CronSchedule, error) {
+			return newPacketFenceRevocationSchedule(ctx, deps.instanceID, deps.ds, deps.logger)
+		})
+	} else {
+		deps.logger.InfoContext(ctx, "skipping packetfence revocation cron (FLEET_PACKETFENCE_BASE_URL, FLEET_PACKETFENCE_USERNAME and FLEET_PACKETFENCE_PASSWORD not set)")
+	}
 }
 
 // legacyAPNsPusherInterval reads FLEET_MDM_APPLE_LEGACY_APNS_PUSHER_INTERVAL,

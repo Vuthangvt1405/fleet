@@ -39,6 +39,7 @@ import (
 	"github.com/fleetdm/fleet/v4/server/policies"
 	"github.com/fleetdm/fleet/v4/server/service"
 	"github.com/fleetdm/fleet/v4/server/service/externalsvc"
+	"github.com/fleetdm/fleet/v4/server/service/packetfence"
 	"github.com/fleetdm/fleet/v4/server/service/schedule"
 	androidvuln "github.com/fleetdm/fleet/v4/server/vulnerabilities/android"
 	"github.com/fleetdm/fleet/v4/server/vulnerabilities/customcve"
@@ -3173,6 +3174,62 @@ func newEndUserNotificationsSchedule(
 		}),
 		schedule.WithJob("remind_and_install_due_patches", func(ctx context.Context) error {
 			return patchNotificationKind.RemindAndInstallDuePatches(ctx)
+		}),
+	)
+
+	return s, nil
+}
+
+func newPacketFenceRevocationSchedule(
+	ctx context.Context,
+	instanceID string,
+	ds fleet.Datastore,
+	logger *slog.Logger,
+) (*schedule.Schedule, error) {
+	const name = string(fleet.CronPacketFenceRevocation)
+
+	cfg := packetfence.ConfigFromEnv()
+	if !cfg.Enabled {
+		return nil, errors.New("packetfence revocation not configured (set FLEET_PACKETFENCE_BASE_URL, FLEET_PACKETFENCE_USERNAME and FLEET_PACKETFENCE_PASSWORD)")
+	}
+	interval := 5 * time.Minute
+	if raw := os.Getenv("FLEET_PACKETFENCE_INTERVAL"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d <= 0 {
+			return nil, fmt.Errorf("invalid FLEET_PACKETFENCE_INTERVAL %q: %w", raw, err)
+		}
+		interval = d
+	}
+
+	store, ok := ds.(packetfence.LedgerStore)
+	if !ok {
+		return nil, errors.New("datastore does not support the packetfence revocation ledger")
+	}
+	policies, ok := ds.(packetfence.PolicyChecker)
+	if !ok {
+		return nil, errors.New("datastore does not support packetfence policy checks")
+	}
+	cves, ok := ds.(packetfence.CVEChecker)
+	if !ok {
+		return nil, errors.New("datastore does not support packetfence CVE checks")
+	}
+	pfClient, err := externalsvc.NewPacketFenceClient(&externalsvc.PacketFenceOptions{
+		BaseURL:  cfg.BaseURL,
+		Username: cfg.Username,
+		Password: cfg.Password,
+		CAFile:   cfg.CAFile,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("packetfence client: %w", err)
+	}
+
+	logger = logger.With("cron", name)
+	r := packetfence.NewReconciler(cfg, store, policies, cves, pfClient, logger)
+	s := schedule.New(
+		ctx, name, instanceID, interval, ds, ds,
+		schedule.WithLogger(logger),
+		schedule.WithJob("packetfence_revocation_reconcile", func(ctx context.Context) error {
+			return r.RunOnce(ctx)
 		}),
 	)
 
