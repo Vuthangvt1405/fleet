@@ -2,64 +2,64 @@ import React, { useState } from "react";
 
 import Button from "components/buttons/Button";
 import InputField from "components/forms/fields/InputField";
+import { IHost } from "interfaces/host";
 import { ISendMessageFormData } from "interfaces/message";
+
+import HostMultiSelect from "./HostMultiSelect";
 
 const baseClass = "send-message-form";
 
 interface ISendMessageFormProps {
   isSending: boolean;
-  onSend: (formData: ISendMessageFormData) => void;
+  onSend: (formData: ISendMessageFormData) => Promise<number[]>;
 }
 
 const SendMessageForm = ({
   isSending,
   onSend,
 }: ISendMessageFormProps): JSX.Element => {
-  const [hostId, setHostId] = useState("");
+  const [selectedHosts, setSelectedHosts] = useState<IHost[]>([]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [hostError, setHostError] = useState<string | null>(null);
 
   type ParsedTarget = { name: string; value: string };
 
   const onFieldChange = ({ name, value }: ParsedTarget) => {
-    if (name === "host_id") {
-      setHostId(value);
-      setHostError(null);
-    } else if (name === "title") {
+    if (name === "title") {
       setTitle(value);
     } else {
       setBody(value);
     }
   };
 
-  const onSubmitForm = (evt: React.FormEvent) => {
+  const onSubmitForm = async (evt: React.FormEvent) => {
     evt.preventDefault();
-    const parsedHostId = Number(hostId);
-    if (!hostId || !Number.isInteger(parsedHostId) || parsedHostId <= 0) {
-      setHostError("Enter a valid host ID.");
+    if (selectedHosts.length === 0) {
       return;
     }
     if (!title.trim() || !body.trim()) {
       return;
     }
-    onSend({ host_id: parsedHostId, title: title.trim(), body: body.trim() });
+    const failedHostIDs = await onSend({
+      host_ids: selectedHosts.map((host) => host.id),
+      title: title.trim(),
+      body: body.trim(),
+    });
+    if (failedHostIDs.length > 0) {
+      setSelectedHosts((currentHosts) =>
+        currentHosts.filter((host) => failedHostIDs.includes(host.id))
+      );
+    }
   };
 
   const isValid =
-    hostId.trim() !== "" && title.trim() !== "" && body.trim() !== "";
+    selectedHosts.length > 0 && title.trim() !== "" && body.trim() !== "";
 
   return (
     <form className={`${baseClass}`} onSubmit={onSubmitForm}>
-      <InputField
-        error={hostError}
-        parseTarget
-        name="host_id"
-        onChange={onFieldChange}
-        value={hostId}
-        label="Host ID"
-        placeholder="e.g. 42"
-        type="text"
+      <HostMultiSelect
+        selectedHosts={selectedHosts}
+        onChange={setSelectedHosts}
       />
       <InputField
         parseTarget

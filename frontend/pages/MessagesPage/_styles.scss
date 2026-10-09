@@ -40,3 +40,20 @@
     gap: $pad-medium;
   }
 }
+
+.host-multi-select {
+  &__option {
+    display: flex;
+    flex-direction: column;
+    gap: $pad-small;
+  }
+
+  &__hostname {
+    color: $core-fleet-black;
+  }
+
+  &__help-text {
+    color: $ui-fleet-black-75;
+    font-size: $xx-small;
+  }
+}
