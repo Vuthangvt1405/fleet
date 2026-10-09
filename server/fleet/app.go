@@ -1236,6 +1236,9 @@ func (c *AppConfig) Obfuscate() {
 	for _, gwIntegration := range c.Integrations.GoogleWorkspace {
 		gwIntegration.ApiKey.SetMasked()
 	}
+	if c.Integrations.PacketFence != nil && c.Integrations.PacketFence.Password != "" {
+		c.Integrations.PacketFence.Password = MaskedPassword
+	}
 	// Integrations.CertificatesIdPIntrospectionURLs and CertificatesIdPClientIDs are deliberately not masked: no secret,
 	// just URLs and public OAuth client IDs.
 	// The Apple account provisioning IdP client secret lives in
@@ -1348,6 +1351,11 @@ func (c *AppConfig) Copy() *AppConfig {
 				maps.Copy(clone.Integrations.GoogleWorkspace[i].ApiKey.Values, g.ApiKey.Values)
 			}
 		}
+	}
+	if c.Integrations.PacketFence != nil {
+		pf := *c.Integrations.PacketFence
+		pf.ManagedEventTypes = slices.Clone(pf.ManagedEventTypes)
+		clone.Integrations.PacketFence = &pf
 	}
 	if c.Integrations.CertificatesIdPIntrospectionURLs.Value != nil {
 		clone.Integrations.CertificatesIdPIntrospectionURLs.Value = slices.Clone(c.Integrations.CertificatesIdPIntrospectionURLs.Value)

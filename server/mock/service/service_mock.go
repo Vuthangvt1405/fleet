@@ -324,6 +324,7 @@ type HostDeviceURLFunc func(ctx context.Context, hostID uint) (string, error)
 type NewAppConfigFunc func(ctx context.Context, p fleet.AppConfig) (info *fleet.AppConfig, err error)
 
 type AppConfigObfuscatedFunc func(ctx context.Context) (info *fleet.AppConfig, err error)
+type TestPacketFenceConnectionFunc func(ctx context.Context, baseURL, username, password string) error
 
 type ModifyAppConfigFunc func(ctx context.Context, p []byte, applyOpts fleet.ApplySpecOptions) (info *fleet.AppConfig, err error)
 
@@ -1501,8 +1502,10 @@ type Service struct {
 	NewAppConfigFunc        NewAppConfigFunc
 	NewAppConfigFuncInvoked bool
 
-	AppConfigObfuscatedFunc        AppConfigObfuscatedFunc
-	AppConfigObfuscatedFuncInvoked bool
+	AppConfigObfuscatedFunc              AppConfigObfuscatedFunc
+	AppConfigObfuscatedFuncInvoked       bool
+	TestPacketFenceConnectionFunc        TestPacketFenceConnectionFunc
+	TestPacketFenceConnectionFuncInvoked bool
 
 	ModifyAppConfigFunc        ModifyAppConfigFunc
 	ModifyAppConfigFuncInvoked bool
@@ -3652,6 +3655,13 @@ func (s *Service) AppConfigObfuscated(ctx context.Context) (info *fleet.AppConfi
 	s.AppConfigObfuscatedFuncInvoked = true
 	s.mu.Unlock()
 	return s.AppConfigObfuscatedFunc(ctx)
+}
+
+func (s *Service) TestPacketFenceConnection(ctx context.Context, baseURL, username, password string) error {
+	s.mu.Lock()
+	s.TestPacketFenceConnectionFuncInvoked = true
+	s.mu.Unlock()
+	return s.TestPacketFenceConnectionFunc(ctx, baseURL, username, password)
 }
 
 func (s *Service) ModifyAppConfig(ctx context.Context, p []byte, applyOpts fleet.ApplySpecOptions) (info *fleet.AppConfig, err error) {

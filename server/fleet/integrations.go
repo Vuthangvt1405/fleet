@@ -492,6 +492,7 @@ type Integrations struct {
 	Zendesk         []*ZendeskIntegration         `json:"zendesk"`
 	GoogleCalendar  []*GoogleCalendarIntegration  `json:"google_calendar"`
 	GoogleWorkspace []*GoogleWorkspaceIntegration `json:"google_workspace,omitempty"`
+	PacketFence     *PacketFenceIntegration       `json:"packetfence,omitempty"`
 	// CertificatesIdPIntrospectionURLs allowlists the OAuth 2.0 token introspection endpoints permitted
 	// to vouch for certificate requests. Closed by default: while empty, no IdP credentials are
 	// accepted. Once populated, credentials are mandatory and the endpoint must be listed. URLs are
@@ -505,6 +506,19 @@ type Integrations struct {
 	CertificatesDisableHostEndUserBinding optjson.Bool `json:"certificates_disable_host_end_user_binding"`
 	// ConditionalAccessEnabled indicates whether conditional access is enabled/disabled for "No team".
 	ConditionalAccessEnabled optjson.Bool `json:"conditional_access_enabled"`
+}
+
+// PacketFenceIntegration configures Fleet-owned PacketFence event revocation.
+type PacketFenceIntegration struct {
+	BaseURL                   string   `json:"base_url"`
+	Username                  string   `json:"username"`
+	Password                  string   `json:"password,omitempty"`
+	Enabled                   bool     `json:"enabled"`
+	ManagedEventTypes         []string `json:"managed_event_types"`
+	RequireExclusiveOwnership bool     `json:"require_exclusive_ownership"`
+	PolicyChecksRequired      int      `json:"policy_checks_required"`
+	CVEChecksRequired         int      `json:"cve_checks_required"`
+	DryRun                    bool     `json:"dry_run"`
 }
 
 // CheckCertIdPIntrospection enforces the IdP allowlists against one request whose credentials have
@@ -577,6 +591,39 @@ func isAbsoluteHTTPSURL(rawURL string) bool {
 	// Userinfo is refused: the allowlist is stored unmasked, and a credential there would be
 	// sent with every introspection call.
 	return parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil
+}
+
+// ValidatePacketFenceIntegration rejects configurations that could clear a
+// shared event or use an incomplete connection.
+func ValidatePacketFenceIntegration(p *PacketFenceIntegration, invalid *InvalidArgumentError) {
+	if p == nil {
+		return
+	}
+	if p.BaseURL != "" && !isAbsoluteHTTPSURL(p.BaseURL) {
+		invalid.Append("integrations.packetfence.base_url", "must be an absolute https URL without credentials")
+	}
+	if !p.Enabled {
+		return
+	}
+	if p.BaseURL == "" || p.Username == "" || p.Password == "" || p.Password == MaskedPassword {
+		invalid.Append("integrations.packetfence", "URL, username, and password are required when enabled")
+	}
+	if !p.RequireExclusiveOwnership {
+		invalid.Append("integrations.packetfence.require_exclusive_ownership", "must be true when enabled")
+	}
+	if p.PolicyChecksRequired < 2 || p.CVEChecksRequired < 1 {
+		invalid.Append("integrations.packetfence", "policy checks must be at least 2 and CVE cycles at least 1")
+	}
+	if len(p.ManagedEventTypes) == 0 {
+		invalid.Append("integrations.packetfence.managed_event_types", "at least one dedicated event type is required")
+	}
+	seen := make(map[string]bool, len(p.ManagedEventTypes))
+	for _, eventType := range p.ManagedEventTypes {
+		if eventType == "" || strings.Trim(eventType, "0123456789") != "" || seen[eventType] {
+			invalid.Append("integrations.packetfence.managed_event_types", "event types must be unique numeric IDs")
+		}
+		seen[eventType] = true
+	}
 }
 
 // IsGoogleWorkspaceConfigured reports whether a Google Workspace IdP integration
