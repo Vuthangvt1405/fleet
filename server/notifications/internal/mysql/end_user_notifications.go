@@ -386,6 +386,26 @@ func (ds *Datastore) VerifyEndUserNotification(ctx context.Context, notification
 	return nil
 }
 
+// MarkEndUserNotificationDisplayed records the first time an agent-reported
+// notification reached its end user, and moves it out of the pending set so
+// the agent stops polling for it. The row becomes dispatched, which is what
+// the admin history reads as sent, and which the dispatch query (pending
+// only) ignores. The host scope keeps one host from acking another host's
+// notification. Calling it again doesn't move the timestamp.
+func (ds *Datastore) MarkEndUserNotificationDisplayed(ctx context.Context, notificationUUID string, hostID uint, displayedAt time.Time) error {
+	const markStmt = `
+UPDATE notifications_end_user
+SET status = ?, displayed_at = IF(displayed_at IS NULL, ?, displayed_at)
+WHERE uuid = ? AND host_id = ? AND displayed_at IS NULL
+`
+	if _, err := ds.primary.ExecContext(ctx, markStmt,
+		api.EndUserNotificationDispatched, displayedAt, notificationUUID, hostID,
+	); err != nil {
+		return ctxerr.Wrap(ctx, err, "mark end user notification displayed")
+	}
+	return nil
+}
+
 // DelayEndUserNotification puts a notification back in the queue for a later
 // attempt. A non-nil payload replaces its content, so a reminder is the same
 // notification rather than a second one.

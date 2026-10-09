@@ -25,6 +25,7 @@ func TestEndUserNotifications(t *testing.T) {
 		{"ListToDispatch", testListEndUserNotificationsToDispatch},
 		{"ListByKind", testListEndUserNotificationsByKind},
 		{"ListPendingForHost", testListPendingEndUserNotificationsForHost},
+		{"MarkDisplayed", testMarkEndUserNotificationDisplayed},
 		{"SetDispatched", testSetEndUserNotificationsDispatched},
 		{"DeferForHosts", testDeferEndUserNotificationsForHosts},
 		{"Expire", testExpireEndUserNotifications},
@@ -331,11 +332,64 @@ func testListPendingEndUserNotificationsForHost(t *testing.T, env *testEnv) {
 		defer env.TruncateTables(t)
 		hostID := newDarwinHost(t, env, "pending-displayed", true)
 		uuid := env.InsertNotification(t, hostID, "message", nil, nil)
-		require.NoError(t, env.ds.VerifyEndUserNotification(ctx, uuid, time.Now().UTC()))
+		require.NoError(t, env.ds.MarkEndUserNotificationDisplayed(ctx, uuid, hostID, time.Now().UTC()))
 
 		due, err := env.ds.ListPendingEndUserNotificationsForHost(ctx, hostID)
 		require.NoError(t, err)
 		assert.Empty(t, due)
+	})
+}
+
+func testMarkEndUserNotificationDisplayed(t *testing.T, env *testEnv) {
+	ctx := t.Context()
+
+	t.Run("pending row leaves the pending list and reads as sent", func(t *testing.T) {
+		defer env.TruncateTables(t)
+		hostID := newDarwinHost(t, env, "mark-displayed", true)
+		uuid := env.InsertNotification(t, hostID, "message", nil, nil)
+
+		due, err := env.ds.ListPendingEndUserNotificationsForHost(ctx, hostID)
+		require.NoError(t, err)
+		require.Len(t, due, 1)
+
+		displayedAt := time.Now().UTC()
+		require.NoError(t, env.ds.MarkEndUserNotificationDisplayed(ctx, uuid, hostID, displayedAt))
+
+		due, err = env.ds.ListPendingEndUserNotificationsForHost(ctx, hostID)
+		require.NoError(t, err)
+		assert.Empty(t, due)
+
+		stored, err := env.ds.GetEndUserNotificationByUUID(ctx, uuid)
+		require.NoError(t, err)
+		assert.Equal(t, api.EndUserNotificationDispatched, stored.Status)
+		require.NotNil(t, stored.DisplayedAt)
+		assert.WithinDuration(t, displayedAt, *stored.DisplayedAt, time.Second)
+	})
+
+	t.Run("second mark keeps the first display time", func(t *testing.T) {
+		defer env.TruncateTables(t)
+		hostID := newDarwinHost(t, env, "mark-displayed-twice", true)
+		uuid := env.InsertNotification(t, hostID, "message", nil, nil)
+		first := time.Now().UTC().Add(-time.Minute)
+		require.NoError(t, env.ds.MarkEndUserNotificationDisplayed(ctx, uuid, hostID, first))
+		require.NoError(t, env.ds.MarkEndUserNotificationDisplayed(ctx, uuid, hostID, time.Now().UTC()))
+
+		stored, err := env.ds.GetEndUserNotificationByUUID(ctx, uuid)
+		require.NoError(t, err)
+		require.NotNil(t, stored.DisplayedAt)
+		assert.WithinDuration(t, first, *stored.DisplayedAt, time.Second)
+	})
+
+	t.Run("another host's mark leaves the row pending", func(t *testing.T) {
+		defer env.TruncateTables(t)
+		hostID := newDarwinHost(t, env, "mark-displayed-owner", true)
+		otherID := newDarwinHost(t, env, "mark-displayed-stranger", true)
+		uuid := env.InsertNotification(t, hostID, "message", nil, nil)
+		require.NoError(t, env.ds.MarkEndUserNotificationDisplayed(ctx, uuid, otherID, time.Now().UTC()))
+
+		due, err := env.ds.ListPendingEndUserNotificationsForHost(ctx, hostID)
+		require.NoError(t, err)
+		require.Len(t, due, 1)
 	})
 }
 

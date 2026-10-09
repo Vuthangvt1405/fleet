@@ -23,6 +23,13 @@ type mockDatastore struct {
 	// how many expired notifications are left to delete, and the limit each delete asked for
 	deletable     int64
 	deleteBatches []int
+
+	// storedNotification is what GetEndUserNotificationByUUID returns.
+	storedNotification *api.EndUserNotification
+	// marked records MarkEndUserNotificationDisplayed calls.
+	markedUUID   string
+	markedHostID uint
+	markedAt     time.Time
 }
 
 func (m *mockDatastore) ExpireEndUserNotifications(ctx context.Context) (int64, error) {
@@ -54,7 +61,7 @@ func (m *mockDatastore) DeferEndUserNotificationsForHosts(ctx context.Context, h
 }
 
 func (m *mockDatastore) GetEndUserNotificationByUUID(context.Context, string) (*api.EndUserNotification, error) {
-	return nil, nil
+	return m.storedNotification, nil
 }
 
 func (m *mockDatastore) GetEndUserNotificationByExecutionID(context.Context, string) (*api.EndUserNotification, error) {
@@ -62,6 +69,13 @@ func (m *mockDatastore) GetEndUserNotificationByExecutionID(context.Context, str
 }
 
 func (m *mockDatastore) VerifyEndUserNotification(context.Context, string, time.Time) error {
+	return nil
+}
+
+func (m *mockDatastore) MarkEndUserNotificationDisplayed(_ context.Context, notificationUUID string, hostID uint, displayedAt time.Time) error {
+	m.markedUUID = notificationUUID
+	m.markedHostID = hostID
+	m.markedAt = displayedAt
 	return nil
 }
 
