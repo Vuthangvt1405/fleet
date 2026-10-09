@@ -84,6 +84,13 @@ const (
 	// CronEndUserNotifications queues end user notifications that are due and gives up on expired
 	// ones. Runs every 1 minute, which is what a reminder timed to the minute needs.
 	CronEndUserNotifications CronScheduleName = "end_user_notifications"
+	// CronPacketFenceRevocation reconciles Fleet policy/CVE findings recorded
+	// in pf_revocation_ledger with PacketFence security events: it validates
+	// recovery per (MAC, event type) group and requests closure through
+	// PacketFence's REST API. Runs every 5 minutes when PacketFence
+	// revocation is configured via FLEET_PACKETFENCE_* environment variables;
+	// otherwise the schedule is not registered.
+	CronPacketFenceRevocation CronScheduleName = "packetfence_revocation"
 )
 
 type CronSchedulesService interface {
