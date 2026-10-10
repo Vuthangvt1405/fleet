@@ -10,12 +10,17 @@ package packetfence
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/fleetdm/fleet/v4/server/contexts/ctxerr"
 	"github.com/fleetdm/fleet/v4/server/fleet"
+	notifications_api "github.com/fleetdm/fleet/v4/server/notifications/api"
+	"github.com/google/uuid"
 )
 
 const (
@@ -33,6 +38,21 @@ func PfEventTypeForPolicy(policyID uint) (string, bool) {
 		return PfEventTypeFirewall, true
 	}
 	return "", false
+}
+
+// IsPacketFenceWebhook reports whether a failing-policy webhook points to the
+// same HTTPS origin as the configured PacketFence instance. PacketFence's
+// webhook receiver may use a path below the instance base URL, so compare the
+// scheme and authority rather than requiring an identical path.
+func IsPacketFenceWebhook(webhookURL *url.URL, packetFenceBaseURL string) bool {
+	if webhookURL == nil || packetFenceBaseURL == "" {
+		return false
+	}
+	baseURL, err := url.Parse(packetFenceBaseURL)
+	if err != nil || webhookURL.Scheme != "https" || baseURL.Scheme != "https" {
+		return false
+	}
+	return strings.EqualFold(webhookURL.Host, baseURL.Host)
 }
 
 // NormalizeMAC canonicalizes a host MAC for ledger grouping: lowercase,
@@ -56,6 +76,10 @@ type FireStore interface {
 	UpsertPfRevocationFinding(ctx context.Context, f *fleet.PfRevocationFinding) (*fleet.PfRevocationFinding, error)
 }
 
+type policyNotificationCreator interface {
+	CreateNotification(ctx context.Context, notification *notifications_api.EndUserNotification) (*notifications_api.EndUserNotification, error)
+}
+
 // RecordPolicyFire records one ledger row in pending_discovery after a policy
 // automation webhook POST was accepted by the PacketFence receiver. It is a
 // no-op for policies without a PacketFence mapping. A missing host MAC is an
@@ -65,21 +89,21 @@ func RecordPolicyFire(
 	ds FireStore,
 	policyID, hostID uint,
 	firedAt time.Time,
-) error {
+) (*fleet.PfRevocationFinding, error) {
 	eventType, ok := PfEventTypeForPolicy(policyID)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	host, err := ds.Host(ctx, hostID)
 	if err != nil {
-		return ctxerr.Wrap(ctx, err, "load host for pf fire")
+		return nil, ctxerr.Wrap(ctx, err, "load host for pf fire")
 	}
 	mac := NormalizeMAC(host.PrimaryMac)
 	if mac == "" {
-		return ctxerr.New(ctx, "host has no primary MAC for pf fire")
+		return nil, ctxerr.New(ctx, "host has no primary MAC for pf fire")
 	}
 	pid := policyID
-	_, err = ds.UpsertPfRevocationFinding(ctx, &fleet.PfRevocationFinding{
+	finding, err := ds.UpsertPfRevocationFinding(ctx, &fleet.PfRevocationFinding{
 		HostID:      hostID,
 		HostMAC:     mac,
 		TriggerType: fleet.PfTriggerPolicy,
@@ -89,9 +113,9 @@ func RecordPolicyFire(
 		State:       fleet.PfStatePendingDiscovery,
 	})
 	if err != nil {
-		return ctxerr.Wrap(ctx, err, "upsert pf revocation finding")
+		return nil, ctxerr.Wrap(ctx, err, "upsert pf revocation finding")
 	}
-	return nil
+	return finding, nil
 }
 
 // RecordPolicyFireBatch records ledger rows for every successfully sent host.
@@ -108,9 +132,67 @@ func RecordPolicyFireBatch(
 		return
 	}
 	for _, hid := range hostIDs {
-		if err := RecordPolicyFire(ctx, ds, policyID, hid, firedAt); err != nil {
+		if _, err := RecordPolicyFire(ctx, ds, policyID, hid, firedAt); err != nil {
 			logger.WarnContext(ctx, "failed to record pf revocation finding",
 				"policy_id", policyID, "host_id", hid, "err", err)
 		}
 	}
+}
+
+// QueuePolicyFireNotification queues an idempotent end-user message for a
+// PacketFence policy fire. The PacketFence ledger row ID is stable across
+// webhook retries for the same open finding and therefore provides the
+// notification's deterministic UUID.
+func QueuePolicyFireNotification(
+	ctx context.Context,
+	notificationsSvc policyNotificationCreator,
+	finding *fleet.PfRevocationFinding,
+	policy *fleet.Policy,
+	settings *fleet.PacketFenceIntegration,
+	firedAt time.Time,
+) error {
+	if finding == nil || policy == nil || settings == nil || !settings.NotifyEndUsers {
+		return nil
+	}
+	titleTemplate := settings.NotificationTitle
+	if titleTemplate == "" {
+		titleTemplate = "Action needed: {policy_name}"
+	}
+	title := strings.ReplaceAll(titleTemplate, "{policy_name}", policy.Name)
+	resolution := ""
+	if policy.Resolution != nil {
+		resolution = strings.TrimSpace(*policy.Resolution)
+	}
+	if resolution == "" {
+		resolution = "Contact your IT team for help resolving this policy."
+	}
+	body := fmt.Sprintf("This device failed the \u201c%s\u201d policy.\n\nTo resolve this, %s", policy.Name, resolution)
+	if additional := strings.TrimSpace(settings.NotificationAdditionalMessage); additional != "" {
+		body += "\n\n" + additional
+	}
+
+	payload, err := json.Marshal(fleet.MessageNotificationPayload{
+		Title:      title,
+		Body:       body,
+		Sender:     "Fleet automation",
+		Source:     "automation",
+		PolicyID:   policy.ID,
+		PolicyName: policy.Name,
+	})
+	if err != nil {
+		return ctxerr.Wrap(ctx, err, "marshal packetfence policy notification")
+	}
+	notificationUUID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("fleet-packetfence-policy-fire:%d", finding.ID))).String()
+	expiresAt := firedAt.UTC().Add(notifications_api.EndUserNotificationMaxLifetime)
+	_, err = notificationsSvc.CreateNotification(ctx, &notifications_api.EndUserNotification{
+		UUID:      notificationUUID,
+		HostID:    finding.HostID,
+		Kind:      fleet.MessageNotificationKind,
+		Payload:   payload,
+		ExpiresAt: &expiresAt,
+	})
+	if err != nil {
+		return ctxerr.Wrap(ctx, err, "queue packetfence policy notification")
+	}
+	return nil
 }

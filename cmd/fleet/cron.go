@@ -1001,6 +1001,7 @@ func newAutomationsSchedule(
 	intervalReload time.Duration,
 	failingPoliciesSet fleet.FailingPolicySet,
 	newActivitySvc activity_api.NewActivityService,
+	notificationsSvc notifications_api.CreateNotificationService,
 ) (*schedule.Schedule, error) {
 	const (
 		name            = string(fleet.CronAutomations)
@@ -1039,7 +1040,7 @@ func newAutomationsSchedule(
 		schedule.WithJob(
 			"failing_policies_automation",
 			func(ctx context.Context) error {
-				return triggerFailingPoliciesAutomation(ctx, ds, logger.With("automation", "failing_policies"), failingPoliciesSet, newActivitySvc)
+				return triggerFailingPoliciesAutomation(ctx, ds, logger.With("automation", "failing_policies"), failingPoliciesSet, newActivitySvc, notificationsSvc)
 			},
 		),
 	)
@@ -1077,6 +1078,7 @@ func triggerFailingPoliciesAutomation(
 	logger *slog.Logger,
 	failingPoliciesSet fleet.FailingPolicySet,
 	newActivitySvc activity_api.NewActivityService,
+	notificationsSvc notifications_api.CreateNotificationService,
 ) error {
 	appConfig, err := ds.AppConfig(ctx)
 	if err != nil {
@@ -1090,49 +1092,32 @@ func triggerFailingPoliciesAutomation(
 	err = policies.TriggerFailingPoliciesAutomation(ctx, ds, logger, failingPoliciesSet, func(policy *fleet.Policy, cfg policies.FailingPolicyAutomationConfig) error {
 		switch cfg.AutomationType {
 		case policies.FailingPolicyWebhook:
-			// Snapshot hosts before send so ledger rows can be recorded for
-			// the batches the webhook accepted. Send removes hosts per
-			// successful batch; on error the remainder stays in the set.
-			var before []fleet.PolicySetHost
-			if _, ok := packetfence.PfEventTypeForPolicy(policy.ID); ok {
-				var err error
-				before, err = failingPoliciesSet.ListHosts(policy.ID)
-				if err != nil {
-					logger.WarnContext(ctx, "failed to list hosts before pf fire", "policy_id", policy.ID, "err", err)
-					before = nil
-				}
-			}
 			firedAt := time.Now()
-			sendErr := webhooks.SendFailingPoliciesBatchedPOSTs(
-				ctx, policy, failingPoliciesSet, cfg.HostBatchSize, serverURL, cfg.WebhookURL, firedAt, logger, newActivitySvc)
-			if len(before) > 0 {
-				sent := before
-				if sendErr != nil {
-					// Partial success: earlier batches were removed before
-					// the failure. Record only hosts no longer in the set.
-					after, err := failingPoliciesSet.ListHosts(policy.ID)
-					if err != nil {
-						logger.WarnContext(ctx, "failed to list hosts after pf fire", "policy_id", policy.ID, "err", err)
-					} else {
-						remaining := make(map[uint]bool, len(after))
-						for _, h := range after {
-							remaining[h.ID] = true
+			pfIntegration := appConfig.Integrations.PacketFence
+			isPacketFenceWebhook := pfIntegration != nil && packetfence.IsPacketFenceWebhook(cfg.WebhookURL, pfIntegration.BaseURL)
+			var onBatchAccepted func([]fleet.PolicySetHost) error
+			if isPacketFenceWebhook {
+				onBatchAccepted = func(batch []fleet.PolicySetHost) error {
+					for _, host := range batch {
+						finding, err := packetfence.RecordPolicyFire(ctx, ds, policy.ID, host.ID, firedAt)
+						if err != nil {
+							return err
 						}
-						sent = sent[:0]
-						for _, h := range before {
-							if !remaining[h.ID] {
-								sent = append(sent, h)
+						if pfIntegration.NotifyEndUsers {
+							if notificationsSvc == nil {
+								return fmt.Errorf("notifications service is unavailable")
+							}
+							if err := packetfence.QueuePolicyFireNotification(ctx, notificationsSvc, finding, policy, pfIntegration, firedAt); err != nil {
+								logger.WarnContext(ctx, "failed to queue PacketFence policy notification", "policy_id", policy.ID, "host_id", host.ID, "err", err)
+								return err
 							}
 						}
 					}
+					return nil
 				}
-				ids := make([]uint, 0, len(sent))
-				for _, h := range sent {
-					ids = append(ids, h.ID)
-				}
-				packetfence.RecordPolicyFireBatch(ctx, ds, logger, policy.ID, ids, firedAt)
 			}
-			return sendErr
+			return webhooks.SendFailingPoliciesBatchedPOSTsWithCallback(
+				ctx, policy, failingPoliciesSet, cfg.HostBatchSize, serverURL, cfg.WebhookURL, firedAt, logger, newActivitySvc, onBatchAccepted)
 
 		case policies.FailingPolicyJira:
 			hosts, err := failingPoliciesSet.ListHosts(policy.ID)

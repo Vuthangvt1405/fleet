@@ -103,6 +103,27 @@ func SendFailingPoliciesBatchedPOSTs(
 	logger *slog.Logger,
 	newActivitySvc activity_api.NewActivityService,
 ) error {
+	return SendFailingPoliciesBatchedPOSTsWithCallback(
+		ctx, policy, failingPoliciesSet, hostBatchSize, serverURL, webhookURL, now, logger, newActivitySvc, nil,
+	)
+}
+
+// SendFailingPoliciesBatchedPOSTsWithCallback sends failing-policy batches and
+// calls onBatchAccepted after the remote webhook accepts each batch, before
+// removing those hosts from the failing set. Callbacks must be idempotent
+// because a callback error leaves that batch eligible for a webhook retry.
+func SendFailingPoliciesBatchedPOSTsWithCallback(
+	ctx context.Context,
+	policy *fleet.Policy,
+	failingPoliciesSet fleet.FailingPolicySet,
+	hostBatchSize int,
+	serverURL *url.URL,
+	webhookURL *url.URL,
+	now time.Time,
+	logger *slog.Logger,
+	newActivitySvc activity_api.NewActivityService,
+	onBatchAccepted func([]fleet.PolicySetHost) error,
+) error {
 	hosts, err := failingPoliciesSet.ListHosts(policy.ID)
 	if err != nil {
 		return ctxerr.Wrapf(ctx, err, "listing hosts for failing policies set %d", policy.ID)
@@ -158,6 +179,11 @@ func SendFailingPoliciesBatchedPOSTs(
 			return ctxerr.Wrapf(ctx, fleethttp.MaskURLError(err), "posting to %q", fleethttp.MaskSecretURLParams(webhookURL.String()))
 		}
 		recordWebhookRanActivity(ctx, newActivitySvc, policy, batch, logger)
+		if onBatchAccepted != nil {
+			if err := onBatchAccepted(batch); err != nil {
+				return ctxerr.Wrap(ctx, err, "record accepted failing-policy webhook batch")
+			}
+		}
 		if err := failingPoliciesSet.RemoveHosts(policy.ID, batch); err != nil {
 			return ctxerr.Wrapf(ctx, err, "removing hosts %+v from failing policies set %d", batch, policy.ID)
 		}

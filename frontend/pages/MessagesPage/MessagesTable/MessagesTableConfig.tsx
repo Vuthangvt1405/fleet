@@ -94,6 +94,21 @@ const generateTableHeaders = (): IDataColumn[] => {
       ),
     },
     {
+      title: "Trigger",
+      Header: (cellProps) => (
+        <HeaderCell
+          value={cellProps.column.title}
+          isSortedDesc={cellProps.column.isSortedDesc}
+        />
+      ),
+      accessor: "policy_name",
+      Cell: (cellProps: ICellProps) => (
+        <TooltipTruncatedTextCell
+          value={cellProps.row.original.policy_name || "Manual"}
+        />
+      ),
+    },
+    {
       title: "Status",
       Header: (cellProps) => (
         <HeaderCell

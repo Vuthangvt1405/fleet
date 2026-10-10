@@ -57,6 +57,7 @@ func (ds *Datastore) NewEndUserNotification(ctx context.Context, notification *a
 INSERT INTO notifications_end_user (
 	uuid, host_id, status, kind, payload, next_attempt_at, expires_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
 `
 
 	notificationUUID := notification.UUID

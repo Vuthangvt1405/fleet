@@ -510,15 +510,18 @@ type Integrations struct {
 
 // PacketFenceIntegration configures Fleet-owned PacketFence event revocation.
 type PacketFenceIntegration struct {
-	BaseURL                   string   `json:"base_url"`
-	Username                  string   `json:"username"`
-	Password                  string   `json:"password,omitempty"`
-	Enabled                   bool     `json:"enabled"`
-	ManagedEventTypes         []string `json:"managed_event_types"`
-	RequireExclusiveOwnership bool     `json:"require_exclusive_ownership"`
-	PolicyChecksRequired      int      `json:"policy_checks_required"`
-	CVEChecksRequired         int      `json:"cve_checks_required"`
-	DryRun                    bool     `json:"dry_run"`
+	BaseURL                       string   `json:"base_url"`
+	Username                      string   `json:"username"`
+	Password                      string   `json:"password,omitempty"`
+	Enabled                       bool     `json:"enabled"`
+	ManagedEventTypes             []string `json:"managed_event_types"`
+	RequireExclusiveOwnership     bool     `json:"require_exclusive_ownership"`
+	PolicyChecksRequired          int      `json:"policy_checks_required"`
+	CVEChecksRequired             int      `json:"cve_checks_required"`
+	DryRun                        bool     `json:"dry_run"`
+	NotifyEndUsers                bool     `json:"notify_end_users"`
+	NotificationTitle             string   `json:"notification_title,omitempty"`
+	NotificationAdditionalMessage string   `json:"notification_additional_message,omitempty"`
 }
 
 // CheckCertIdPIntrospection enforces the IdP allowlists against one request whose credentials have
@@ -601,6 +604,24 @@ func ValidatePacketFenceIntegration(p *PacketFenceIntegration, invalid *InvalidA
 	}
 	if p.BaseURL != "" && !isAbsoluteHTTPSURL(p.BaseURL) {
 		invalid.Append("integrations.packetfence.base_url", "must be an absolute https URL without credentials")
+	}
+	if p.NotifyEndUsers {
+		if p.BaseURL == "" {
+			invalid.Append("integrations.packetfence.base_url", "is required when end-user notifications are enabled")
+		}
+		if p.NotificationTitle == "" {
+			p.NotificationTitle = "Action needed: {policy_name}"
+		}
+		if len(p.NotificationTitle) > 120 {
+			invalid.Append("integrations.packetfence.notification_title", "must be 120 characters or fewer")
+		}
+		if len(p.NotificationAdditionalMessage) > 1000 {
+			invalid.Append("integrations.packetfence.notification_additional_message", "must be 1000 characters or fewer")
+		}
+		if strings.Contains(strings.ReplaceAll(p.NotificationTitle, "{policy_name}", ""), "{") ||
+			strings.Contains(strings.ReplaceAll(p.NotificationTitle, "{policy_name}", ""), "}") {
+			invalid.Append("integrations.packetfence.notification_title", "only the {policy_name} placeholder is supported")
+		}
 	}
 	if !p.Enabled {
 		return

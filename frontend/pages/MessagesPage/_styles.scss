@@ -85,16 +85,51 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  &__fields {
-    display: flex;
-    flex-direction: column;
-    gap: $pad-medium;
+  &__actions {
+    margin-top: $pad-large;
   }
 
   &__permission-note {
     color: $ui-fleet-black-75;
     font-size: $xx-small;
     margin: 0;
+  }
+
+  &__preview {
+    h3 {
+      font-size: $small;
+      margin: 0 0 $pad-medium;
+    }
+  }
+
+  &__preview-message {
+    background-color: $ui-off-white;
+    border: 1px solid $ui-gray;
+    border-radius: $border-radius-small;
+    padding: $pad-medium;
+    white-space: pre-wrap;
+
+    p {
+      margin: $pad-medium 0 0;
+    }
+  }
+}
+
+.automation-message-modal {
+  &__description {
+    margin: 0 0 $pad-large;
+  }
+
+  &__content {
+    display: grid;
+    gap: $pad-large;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: $pad-medium;
   }
 
   &__preview {

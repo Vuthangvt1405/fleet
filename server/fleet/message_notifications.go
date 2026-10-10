@@ -7,9 +7,12 @@ const MessageNotificationKind = "message"
 // MessageNotificationPayload is the notifications_end_user.payload for
 // notifications of kind "message" (sent from the Messages page).
 type MessageNotificationPayload struct {
-	Title  string `json:"title"`
-	Body   string `json:"body"`
-	Sender string `json:"sender,omitempty"`
+	Title      string `json:"title"`
+	Body       string `json:"body"`
+	Sender     string `json:"sender,omitempty"`
+	Source     string `json:"source,omitempty"`
+	PolicyID   uint   `json:"policy_id,omitempty"`
+	PolicyName string `json:"policy_name,omitempty"`
 }
 
 // MessageNotification is a message sent to a host. It is backed by a
@@ -25,6 +28,9 @@ type MessageNotification struct {
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
 	SenderName string    `json:"sender_name,omitempty"`
+	Source     string    `json:"source,omitempty"`
+	PolicyID   uint      `json:"policy_id,omitempty"`
+	PolicyName string    `json:"policy_name,omitempty"`
 }
 
 // Message notification statuses as exposed to API clients.

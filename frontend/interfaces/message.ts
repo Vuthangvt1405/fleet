@@ -31,6 +31,9 @@ export interface IMessage {
   status: MessageStatus;
   created_at: string;
   sender_name?: string;
+  source?: "automation" | "manual";
+  policy_id?: number;
+  policy_name?: string;
 }
 
 export interface IMessagesResponse {

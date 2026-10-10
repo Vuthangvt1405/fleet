@@ -102,6 +102,9 @@ export interface IPacketFenceIntegration {
   policy_checks_required: number;
   cve_checks_required: number;
   dry_run: boolean;
+  notify_end_users?: boolean;
+  notification_title?: string;
+  notification_additional_message?: string;
 }
 
 // reality is that IZendeskJiraIntegrations are optional – should be something like `extends

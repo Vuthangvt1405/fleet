@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useState } from "react";
-import { useQuery } from "react-query";
+import { useQuery, useQueryClient } from "react-query";
 
 import DataError from "components/DataError";
 import MainContent from "components/MainContent";
@@ -12,6 +12,7 @@ import {
   IMessagesResponse,
   ISendMessageFormData,
 } from "interfaces/message";
+import configAPI from "services/entities/config";
 import messagesAPI from "services/entities/messages";
 
 import AutomationMessageEditor from "./components/AutomationMessageEditor";
@@ -27,10 +28,15 @@ const MessagesPage = (): JSX.Element => {
     isAnyTeamMaintainerOrTeamAdmin,
     isGlobalTechnician,
     isAnyTeamTechnician,
+    config,
   } = useContext(AppContext);
 
   const [isSending, setIsSending] = useState(false);
+  const [isSavingAutomationMessage, setIsSavingAutomationMessage] = useState(
+    false
+  );
   const [formKey, setFormKey] = useState(0);
+  const queryClient = useQueryClient();
 
   const { data: messages, isLoading, error, refetch } = useQuery<
     IMessagesResponse,
@@ -90,6 +96,38 @@ const MessagesPage = (): JSX.Element => {
     [refetch]
   );
 
+  const onSaveAutomationMessage = useCallback(
+    async (formData: {
+      enabled: boolean;
+      title: string;
+      additionalMessage: string;
+    }): Promise<boolean> => {
+      setIsSavingAutomationMessage(true);
+      try {
+        await configAPI.update({
+          integrations: {
+            packetfence: {
+              notify_end_users: formData.enabled,
+              notification_title: formData.title,
+              notification_additional_message: formData.additionalMessage,
+            },
+          },
+        });
+        await queryClient.invalidateQueries(["config"]);
+        notify.success("PacketFence notification settings saved.");
+        return true;
+      } catch (err) {
+        notify.error("Couldn’t save PacketFence notification settings.", {
+          response: err,
+        });
+        return false;
+      } finally {
+        setIsSavingAutomationMessage(false);
+      }
+    },
+    [queryClient]
+  );
+
   // Mirrors the write gate used for labels (`canAddLabel`).
   const canSendMessage =
     isGlobalAdmin ||
@@ -129,7 +167,16 @@ const MessagesPage = (): JSX.Element => {
           />
         </div>
       )}
-      <AutomationMessageEditor canEdit={isGlobalAdmin} />
+      <AutomationMessageEditor
+        canEdit={isGlobalAdmin ?? false}
+        enabled={config?.integrations?.packetfence?.notify_end_users ?? false}
+        initialTitle={config?.integrations?.packetfence?.notification_title}
+        initialAdditionalMessage={
+          config?.integrations?.packetfence?.notification_additional_message
+        }
+        isSaving={isSavingAutomationMessage}
+        onSave={onSaveAutomationMessage}
+      />
       {renderHistory()}
     </MainContent>
   );

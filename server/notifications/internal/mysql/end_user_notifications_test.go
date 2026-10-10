@@ -267,6 +267,21 @@ func testNewAndGetEndUserNotification(t *testing.T, env *testEnv) {
 	require.NotNil(t, clamped.ExpiresAt)
 	assert.WithinDuration(t, time.Now().UTC().Add(api.EndUserNotificationMaxLifetime), *clamped.ExpiresAt, time.Minute)
 
+	// Callers with a stable UUID can safely retry after an uncertain result.
+	stableExpiry := time.Now().UTC().Add(time.Hour)
+	firstAttempt, err := env.ds.NewEndUserNotification(ctx, &api.EndUserNotification{
+		UUID: "stable-notification-uuid", HostID: hostID, Kind: "test_kind",
+		Payload: []byte(`{"title":"first"}`), ExpiresAt: &stableExpiry,
+	})
+	require.NoError(t, err)
+	retry, err := env.ds.NewEndUserNotification(ctx, &api.EndUserNotification{
+		UUID: "stable-notification-uuid", HostID: hostID, Kind: "test_kind",
+		Payload: []byte(`{"title":"retry"}`), ExpiresAt: &stableExpiry,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, firstAttempt.ID, retry.ID)
+	assert.JSONEq(t, `{"title":"first"}`, string(retry.Payload))
+
 	got, err := env.ds.GetEndUserNotificationByUUID(ctx, created.UUID)
 	require.NoError(t, err)
 	assert.Equal(t, created.UUID, got.UUID)

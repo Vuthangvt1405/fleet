@@ -160,5 +160,8 @@ func (svc *Service) messageFromNotification(ctx context.Context, notification *n
 		Status:     messageStatus(notification),
 		CreatedAt:  notification.CreatedAt,
 		SenderName: payload.Sender,
+		Source:     payload.Source,
+		PolicyID:   payload.PolicyID,
+		PolicyName: payload.PolicyName,
 	}, nil
 }
