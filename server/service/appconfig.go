@@ -771,9 +771,6 @@ func (svc *Service) ModifyAppConfig(ctx context.Context, p []byte, applyOpts fle
 				invalid.Append("integrations.packetfence.password", "a password has not been configured")
 			}
 		}
-		if !lic.IsPremium() && merged != nil && merged.Enabled {
-			invalid.Append("integrations.packetfence", ErrMissingLicense.Error())
-		}
 	}
 
 	// if turning off Windows MDM and Windows Migration is not explicitly set to

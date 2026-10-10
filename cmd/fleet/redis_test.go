@@ -61,7 +61,7 @@ func TestPacketFenceDatastoreWrappedForCron(t *testing.T) {
 			assert.True(t, ok)
 
 			// These are the same assertions used at the cron handoff.
-			schedule, err := newPacketFenceRevocationSchedule(context.Background(), "test", ds, logger, true)
+			schedule, err := newPacketFenceRevocationSchedule(context.Background(), "test", ds, logger)
 			require.NoError(t, err)
 			require.NotNil(t, schedule)
 		})

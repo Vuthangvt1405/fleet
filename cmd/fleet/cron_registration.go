@@ -444,7 +444,7 @@ func registerMiscCrons(ctx context.Context, deps cronSchedulesDeps) {
 
 	// Register even before setup; the job reads current AppConfig every run.
 	deps.register("failed to register packetfence revocation schedule", func() (fleet.CronSchedule, error) {
-		return newPacketFenceRevocationSchedule(ctx, deps.instanceID, deps.ds, deps.logger, deps.license != nil && deps.license.IsPremium())
+		return newPacketFenceRevocationSchedule(ctx, deps.instanceID, deps.ds, deps.logger)
 	})
 }
 
