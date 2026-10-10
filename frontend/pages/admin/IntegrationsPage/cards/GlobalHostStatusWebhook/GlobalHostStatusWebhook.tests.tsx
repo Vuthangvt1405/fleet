@@ -10,6 +10,7 @@ const REQUIRED_URL_ERROR = "Destination URL must be present";
 const INVALID_URL_ERROR = "Destination URL is not a valid URL";
 const URL_PLACEHOLDER = "https://server.com/example";
 const ENABLE_LABEL = "Enable host status webhook";
+const INTERVAL_LABEL = "Check interval";
 
 const baseConfig = createMockConfig();
 
@@ -109,5 +110,76 @@ describe("GlobalHostStatusWebhook - Destination URL validation", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(handleSubmit).toHaveBeenCalled();
+  });
+});
+
+describe("GlobalHostStatusWebhook - Check interval", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("shows the configured interval", () => {
+    renderCard();
+
+    // configMock stores "24h0m0s", which renders as 1 Day
+    expect(screen.getByLabelText(INTERVAL_LABEL)).toHaveValue(1);
+    expect(screen.getByText("Days")).toBeInTheDocument();
+  });
+
+  it("shows an error when the amount is cleared and blurred", async () => {
+    const { user } = renderCard();
+
+    await user.clear(screen.getByLabelText(INTERVAL_LABEL));
+    await user.tab();
+
+    expect(
+      await screen.findByText("Interval must be present")
+    ).toBeInTheDocument();
+  });
+
+  it("blocks submit when the interval is invalid", async () => {
+    const { user, handleSubmit } = renderCard();
+
+    await user.clear(screen.getByLabelText(INTERVAL_LABEL));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Interval must be present")
+    ).toBeInTheDocument();
+    expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it("blocks submit when the interval is above 7 days", async () => {
+    const { user, handleSubmit } = renderCard();
+
+    const input = screen.getByLabelText(INTERVAL_LABEL);
+    await user.clear(input);
+    await user.type(input, "10081");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Interval must be 7 days or less")
+    ).toBeInTheDocument();
+    expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it("submits the interval formatted as a Go duration", async () => {
+    const { user, handleSubmit } = renderCard();
+
+    // Switch the unit from Days to Hours, then set 12
+    await user.click(screen.getByText("Days"));
+    await user.click(screen.getByText("Hours"));
+
+    const input = screen.getByLabelText(INTERVAL_LABEL);
+    await user.clear(input);
+    await user.type(input, "12");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(handleSubmit).toHaveBeenCalled();
+    expect(handleSubmit.mock.calls[0][0].webhook_settings.interval).toBe(
+      "12h0m0s"
+    );
   });
 });

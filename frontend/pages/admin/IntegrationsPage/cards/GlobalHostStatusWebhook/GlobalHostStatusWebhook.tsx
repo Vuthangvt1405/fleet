@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 
 import Button from "components/buttons/Button";
+import AutomationIntervalField from "components/forms/fields/AutomationIntervalField";
 import Checkbox from "components/forms/fields/Checkbox";
 // @ts-ignore
 import Dropdown from "components/forms/fields/Dropdown";
@@ -16,6 +17,13 @@ import {
   HOST_STATUS_WEBHOOK_WINDOW_DROPDOWN_OPTIONS,
 } from "utilities/constants";
 import { getCustomDropdownOptions } from "utilities/helpers";
+import {
+  DEFAULT_WEBHOOK_INTERVAL,
+  formatWebhookInterval,
+  parseWebhookInterval,
+  validateWebhookInterval,
+  WebhookIntervalUnit,
+} from "utilities/webhook_interval";
 
 import { IAppConfigFormProps } from "../../../OrgSettingsPage/cards/constants";
 
@@ -24,10 +32,13 @@ interface IGlobalHostStatusWebhookFormData {
   destination_url?: string;
   hostStatusWebhookHostPercentage: number;
   hostStatusWebhookWindow: number;
+  intervalAmount: string;
+  intervalUnit: WebhookIntervalUnit;
 }
 
 interface IGlobalHostStatusWebhookFormErrors {
   destination_url?: string;
+  interval?: string;
 }
 
 const baseClass = "app-config-form";
@@ -38,6 +49,9 @@ const GlobalHostStatusWebhook = ({
   isUpdatingSettings,
 }: IAppConfigFormProps): JSX.Element => {
   const gitOpsModeEnabled = appConfig.gitops.gitops_mode_enabled;
+  const initialInterval =
+    parseWebhookInterval(appConfig.webhook_settings.interval) ??
+    DEFAULT_WEBHOOK_INTERVAL;
   const [
     showHostStatusWebhookPreviewModal,
     setShowHostStatusWebhookPreviewModal,
@@ -52,6 +66,8 @@ const GlobalHostStatusWebhook = ({
       appConfig.webhook_settings.host_status_webhook?.host_percentage || 1,
     hostStatusWebhookWindow:
       appConfig.webhook_settings.host_status_webhook?.days_count || 1,
+    intervalAmount: `${initialInterval.amount}`,
+    intervalUnit: initialInterval.unit,
   });
 
   const {
@@ -59,6 +75,8 @@ const GlobalHostStatusWebhook = ({
     destination_url,
     hostStatusWebhookHostPercentage,
     hostStatusWebhookWindow,
+    intervalAmount,
+    intervalUnit,
   } = formData;
 
   const [
@@ -82,6 +100,11 @@ const GlobalHostStatusWebhook = ({
       }
     }
 
+    const intervalError = validateWebhookInterval(intervalAmount, intervalUnit);
+    if (intervalError) {
+      errors.interval = intervalError;
+    }
+
     return errors;
   };
 
@@ -89,6 +112,21 @@ const GlobalHostStatusWebhook = ({
   // the user has had a chance to enter a URL (#40410).
   const validateForm = () => {
     setFormErrors(getFormErrors());
+  };
+
+  // Validates only the interval field so blurring it doesn't surface the
+  // destination URL error before the user has had a chance to enter a URL.
+  const validateInterval = () => {
+    const intervalError = validateWebhookInterval(intervalAmount, intervalUnit);
+    setFormErrors((prevErrors) => {
+      const nextErrors = { ...prevErrors };
+      if (intervalError) {
+        nextErrors.interval = intervalError;
+      } else {
+        delete nextErrors.interval;
+      }
+      return nextErrors;
+    });
   };
 
   const toggleHostStatusWebhookPreviewModal = () => {
@@ -118,6 +156,7 @@ const GlobalHostStatusWebhook = ({
           appConfig.webhook_settings.failing_policies_webhook,
         vulnerabilities_webhook:
           appConfig.webhook_settings.vulnerabilities_webhook,
+        interval: formatWebhookInterval(intervalAmount, intervalUnit),
       },
     };
 
@@ -226,6 +265,19 @@ const GlobalHostStatusWebhook = ({
                 />
               </>
             )}
+            <AutomationIntervalField
+              amount={intervalAmount}
+              unit={intervalUnit}
+              onAmountChange={(value) =>
+                onInputChange({ name: "intervalAmount", value })
+              }
+              onUnitChange={(value) =>
+                onInputChange({ name: "intervalUnit", value })
+              }
+              onBlur={validateInterval}
+              error={formErrors.interval}
+              helpText="Fleet checks your automations on this interval and sends requests when conditions are met. This interval is shared with policy automations."
+            />
           </div>
           <GitOpsModeTooltipWrapper
             renderChildren={(disableChildren) => (

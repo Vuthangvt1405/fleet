@@ -301,6 +301,13 @@ export interface IWebhookSettings {
   vulnerabilities_webhook: IWebhookSoftwareVulnerabilities;
   activities_webhook: IWebhookActivities;
   host_activities_webhook?: IWebhookHostActivities | null;
+  /**
+   * How often the global automations cron runs, as a Go duration string
+   * (e.g. "24h0m0s"). Global-only: shared by the host status and failing
+   * policies webhooks (does not apply to vulnerabilities/activities
+   * webhooks or report/log-destination automations).
+   */
+  interval?: string;
 }
 
 export type IAutomationsConfig = Pick<

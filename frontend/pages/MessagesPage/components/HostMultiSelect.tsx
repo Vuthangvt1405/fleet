@@ -20,6 +20,8 @@ import {
 import FormField from "components/forms/FormField";
 import { IHost } from "interfaces/host";
 import hostsAPI from "services/entities/hosts";
+import { COLORS } from "styles/var/colors";
+import { PADDING } from "styles/var/padding";
 import debounce from "utilities/debounce";
 
 const baseClass = "host-multi-select";
@@ -29,6 +31,53 @@ const HOST_SEARCH_PAGE_SIZE = 20;
 interface IHostSelectOption extends CustomOptionType {
   host: IHost;
 }
+
+const hostMultiSelectStyles = (): StylesConfig<IHostSelectOption, true> => {
+  const baseStyles = (generateCustomDropdownStyles(
+    undefined,
+    false,
+    false,
+    305
+  ) as unknown) as StylesConfig<IHostSelectOption, true>;
+
+  return {
+    ...baseStyles,
+    container: (provided, state) => ({
+      ...(baseStyles.container?.(provided, state) ?? provided),
+      height: "auto",
+      minHeight: "36px",
+    }),
+    valueContainer: (provided, state) => ({
+      ...(baseStyles.valueContainer?.(provided, state) ?? provided),
+      display: "flex",
+      flexWrap: "wrap",
+      gap: PADDING["pad-xsmall"],
+      padding: `${PADDING["pad-xsmall"]} 0`,
+    }),
+    multiValue: (provided) => ({
+      ...provided,
+      backgroundColor: COLORS["ui-fleet-black-5"],
+      border: `1px solid ${COLORS["ui-fleet-black-10"]}`,
+      borderRadius: "4px",
+      margin: 0,
+    }),
+    multiValueLabel: (provided) => ({
+      ...provided,
+      color: COLORS["ui-fleet-black-75"],
+      fontSize: "13px",
+      padding: "2px 6px",
+    }),
+    multiValueRemove: (provided) => ({
+      ...provided,
+      color: COLORS["ui-fleet-black-75"],
+      borderRadius: "0 4px 4px 0",
+      ":hover": {
+        backgroundColor: COLORS["ui-fleet-black-10"],
+        color: COLORS["core-fleet-black"],
+      },
+    }),
+  };
+};
 
 interface IHostMultiSelectProps {
   selectedHosts: IHost[];
@@ -122,12 +171,8 @@ const HostMultiSelect = ({
           isMulti
           isSearchable
           isLoading={isLoading}
-          styles={
-            (generateCustomDropdownStyles() as unknown) as StylesConfig<
-              IHostSelectOption,
-              true
-            >
-          }
+          closeMenuOnSelect={false}
+          styles={hostMultiSelectStyles()}
           options={options}
           value={selectedHosts.map(toOption)}
           components={{ Option: HostOption }}
