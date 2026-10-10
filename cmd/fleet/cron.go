@@ -3185,7 +3185,6 @@ func newPacketFenceRevocationSchedule(
 	instanceID string,
 	ds fleet.Datastore,
 	logger *slog.Logger,
-	premium bool,
 ) (*schedule.Schedule, error) {
 	const name = string(fleet.CronPacketFenceRevocation)
 
@@ -3215,9 +3214,6 @@ func newPacketFenceRevocationSchedule(
 		ctx, name, instanceID, interval, ds, ds,
 		schedule.WithLogger(logger),
 		schedule.WithJob("packetfence_revocation_reconcile", func(ctx context.Context) error {
-			if !premium {
-				return nil
-			}
 			appConfig, err := ds.AppConfig(ctx)
 			if err != nil {
 				return err

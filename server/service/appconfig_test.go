@@ -4275,3 +4275,70 @@ func TestStagedUploadAvailable(t *testing.T) {
 		require.Equal(t, c.want, svc.StagedUploadAvailable(ctx), "%+v", c)
 	}
 }
+
+// TestModifyAppConfigPacketFenceOnFreeTier verifies the PacketFence
+// integration can be enabled without a premium license (it is a free-tier
+// feature), while the rest of the license-gated validation still applies.
+func TestModifyAppConfigPacketFenceOnFreeTier(t *testing.T) {
+	admin := &fleet.User{GlobalRole: ptr.String(fleet.RoleAdmin)}
+
+	newSvc := func(t *testing.T) (fleet.Service, context.Context, *mock.Store, **fleet.PacketFenceIntegration) {
+		ds := new(mock.Store)
+		svc, ctx := newTestService(t, ds, nil, nil, &TestServerOpts{License: &fleet.LicenseInfo{Tier: fleet.TierFree}})
+		ctx = viewer.NewContext(ctx, viewer.Viewer{User: admin})
+
+		dsAppConfig := &fleet.AppConfig{
+			OrgInfo:        fleet.OrgInfo{OrgName: "Test"},
+			ServerSettings: fleet.ServerSettings{ServerURL: "https://example.org"},
+		}
+		ds.AppConfigFunc = func(ctx context.Context) (*fleet.AppConfig, error) { return dsAppConfig, nil }
+		ds.SaveAppConfigFunc = func(ctx context.Context, conf *fleet.AppConfig) error {
+			*dsAppConfig = *conf
+			return nil
+		}
+		ds.SaveABMTokenFunc = func(ctx context.Context, tok *fleet.ABMToken) error { return nil }
+		ds.ListVPPTokensFunc = func(ctx context.Context) ([]*fleet.VPPTokenDB, error) {
+			return []*fleet.VPPTokenDB{}, nil
+		}
+		ds.ListABMTokensFunc = func(ctx context.Context) ([]*fleet.ABMToken, error) {
+			return []*fleet.ABMToken{}, nil
+		}
+		ds.ValidateEmbeddedSecretsFunc = func(ctx context.Context, documents []string) error { return nil }
+
+		return svc, ctx, ds, &dsAppConfig.Integrations.PacketFence
+	}
+
+	body := []byte(`{"integrations":{"packetfence":{` +
+		`"base_url":"https://pf.example.com",` +
+		`"username":"fleet","password":"secret","enabled":true,` +
+		`"managed_event_types":["1500"],"require_exclusive_ownership":true,` +
+		`"policy_checks_required":2,"cve_checks_required":1}}}`)
+
+	t.Run("enabled config saves on free tier", func(t *testing.T) {
+		svc, ctx, ds, saved := newSvc(t)
+		modified, err := svc.ModifyAppConfig(ctx, body, fleet.ApplySpecOptions{})
+		require.NoError(t, err, "PacketFence must not require a premium license")
+		require.True(t, ds.SaveAppConfigFuncInvoked)
+		require.NotNil(t, modified.Integrations.PacketFence)
+		require.True(t, modified.Integrations.PacketFence.Enabled)
+		require.NotNil(t, *saved)
+		require.True(t, (*saved).Enabled)
+		require.Equal(t, "https://pf.example.com", (*saved).BaseURL)
+	})
+
+	t.Run("validation errors still reported on free tier", func(t *testing.T) {
+		svc, ctx, ds, _ := newSvc(t)
+		// Enabled but missing the required exclusive ownership flag.
+		invalidBody := []byte(`{"integrations":{"packetfence":{` +
+			`"base_url":"https://pf.example.com",` +
+			`"username":"fleet","password":"secret","enabled":true,` +
+			`"managed_event_types":["1500"],"require_exclusive_ownership":false,` +
+			`"policy_checks_required":2,"cve_checks_required":1}}}`)
+		_, err := svc.ModifyAppConfig(ctx, invalidBody, fleet.ApplySpecOptions{})
+		require.Error(t, err)
+		var argErr *fleet.InvalidArgumentError
+		require.ErrorAs(t, err, &argErr)
+		require.Contains(t, argErr.Error(), "require_exclusive_ownership")
+		require.False(t, ds.SaveAppConfigFuncInvoked)
+	})
+}
