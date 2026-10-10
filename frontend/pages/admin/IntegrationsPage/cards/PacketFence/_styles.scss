@@ -1,0 +1,58 @@
+.packetfence-integration {
+  &__section {
+    margin-bottom: $pad-large;
+  }
+
+  &__section-title {
+    font-size: $medium;
+    font-weight: $bold;
+    margin: 0 0 $pad-medium;
+  }
+
+  &__test-row {
+    display: flex;
+    align-items: center;
+    gap: $pad-medium;
+    margin-top: $pad-medium;
+  }
+
+  &__status {
+    margin: 0;
+    font-size: $x-small;
+
+    &--success {
+      color: $ui-success;
+    }
+
+    &--error {
+      color: $ui-error;
+    }
+  }
+}
+
+.enable-auto-clear-modal {
+  &__summary {
+    display: grid;
+    gap: $pad-small;
+    margin: $pad-medium 0;
+    padding: $pad-medium;
+    background-color: $ui-fleet-black-5;
+    border-radius: $border-radius;
+
+    div {
+      display: flex;
+      justify-content: space-between;
+      gap: $pad-medium;
+    }
+
+    dt {
+      font-weight: $bold;
+    }
+
+    dd {
+      margin: 0;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+  }
+}

@@ -11,6 +11,7 @@ import ConditionalAccess from "./cards/ConditionalAccess";
 import IdentityProviders from "./cards/IdentityProviders";
 import TicketDestinations from "./cards/Integrations";
 import MdmSettings from "./cards/MdmSettings";
+import PacketFence from "./cards/PacketFence";
 import Sso from "./cards/Sso";
 
 const getIntegrationSettingsNavItems = (): ISideNavItem<any>[] => {
@@ -74,6 +75,12 @@ const getIntegrationSettingsNavItems = (): ISideNavItem<any>[] => {
       urlSection: "conditional-access",
       path: PATHS.ADMIN_INTEGRATIONS_CONDITIONAL_ACCESS,
       Card: ConditionalAccess,
+    },
+    {
+      title: "PacketFence",
+      urlSection: "packetfence",
+      path: PATHS.ADMIN_INTEGRATIONS_PACKETFENCE,
+      Card: PacketFence,
     },
   ];
 

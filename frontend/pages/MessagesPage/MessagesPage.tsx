@@ -40,48 +40,15 @@ const MessagesPage = (): JSX.Element => {
   });
 
   const onSend = useCallback(
-    async (formData: ISendMessageFormData): Promise<number[]> => {
+    async (formData: ISendMessageFormData) => {
       try {
         setIsSending(true);
-        const results = await Promise.allSettled(
-          formData.host_ids.map((host_id) =>
-            messagesAPI.send({
-              host_id,
-              title: formData.title,
-              body: formData.body,
-            })
-          )
-        );
-        const sentCount = results.filter(
-          (result) => result.status === "fulfilled"
-        ).length;
-        const failedCount = results.length - sentCount;
-        const failedHostIDs: number[] = [];
-        results.forEach((result, index) => {
-          if (result.status === "rejected") {
-            failedHostIDs.push(formData.host_ids[index]);
-          }
-        });
-
-        if (failedCount === 0) {
-          notify.success(
-            `Message sent to ${sentCount} ${
-              sentCount === 1 ? "host" : "hosts"
-            }.`
-          );
-          setFormKey((k) => k + 1);
-        } else if (sentCount > 0) {
-          notify.error(
-            `Message sent to ${sentCount} of ${results.length} hosts. Select the failed hosts and try again.`
-          );
-        } else {
-          notify.error("Couldn't send message to the selected hosts.");
-        }
+        await messagesAPI.send(formData);
+        notify.success("Message sent.");
+        setFormKey((k) => k + 1);
         refetch();
-        return failedHostIDs;
       } catch (err) {
         notify.error("Couldn't send message.", { response: err });
-        return formData.host_ids;
       } finally {
         setIsSending(false);
       }
@@ -104,7 +71,7 @@ const MessagesPage = (): JSX.Element => {
     if (error) {
       return <DataError />;
     }
-    return <MessagesTable messages={messages} />;
+  return <MessagesTable messages={messages} />;
   }, [error, isLoading, messages]);
 
   return (
@@ -115,7 +82,7 @@ const MessagesPage = (): JSX.Element => {
             <div className={`${baseClass}__title`}>
               <h1>Messages</h1>
             </div>
-            <PageDescription content="Send a message to one or more hosts." />
+            <PageDescription content="Send a message to a host." />
           </div>
         </div>
       </div>

@@ -89,11 +89,27 @@ export interface IGlobalGoogleWorkspaceIntegration {
   api_key_json: Record<string, string>;
 }
 
+// PacketFence network-enforcement integration: automatically clear
+// Fleet-owned PacketFence security events after affected hosts recover.
+export interface IPacketFenceIntegration {
+  base_url: string;
+  username: string;
+  // Obfuscated as "********" by the API when a password is already stored.
+  password: string;
+  enabled: boolean;
+  managed_event_types: string[];
+  require_exclusive_ownership: boolean;
+  policy_checks_required: number;
+  cve_checks_required: number;
+  dry_run: boolean;
+}
+
 // reality is that IZendeskJiraIntegrations are optional – should be something like `extends
 // Partial<IZendeskJiraIntegrations>`, but that leads to a mess of types to resolve.
 export interface IGlobalIntegrations extends IZendeskJiraIntegrations {
   google_calendar?: IGlobalCalendarIntegration[] | null;
   google_workspace?: IGlobalGoogleWorkspaceIntegration[];
+  packetfence?: IPacketFenceIntegration | null;
   // whether or not conditional access is enabled for "No team"
   conditional_access_enabled?: boolean;
 }
