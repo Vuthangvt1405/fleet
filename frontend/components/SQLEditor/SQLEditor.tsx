@@ -240,7 +240,14 @@ const SQLEditor = ({
       });
 
       // make the internal textarea unfocusable via keyboard
-      const textarea = editor.textInput?.getElement?.();
+      // (textInput exists at runtime but is missing from ace-builds 1.4.14 types)
+      const textarea = ((editor as unknown) as {
+        textInput?: {
+          getElement?: () =>
+            | { setAttribute: (k: string, v: string) => void }
+            | undefined;
+        };
+      }).textInput?.getElement?.();
       if (textarea) {
         textarea.setAttribute("tabindex", "-1");
       }
