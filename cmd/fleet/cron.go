@@ -1090,8 +1090,49 @@ func triggerFailingPoliciesAutomation(
 	err = policies.TriggerFailingPoliciesAutomation(ctx, ds, logger, failingPoliciesSet, func(policy *fleet.Policy, cfg policies.FailingPolicyAutomationConfig) error {
 		switch cfg.AutomationType {
 		case policies.FailingPolicyWebhook:
-			return webhooks.SendFailingPoliciesBatchedPOSTs(
-				ctx, policy, failingPoliciesSet, cfg.HostBatchSize, serverURL, cfg.WebhookURL, time.Now(), logger, newActivitySvc)
+			// Snapshot hosts before send so ledger rows can be recorded for
+			// the batches the webhook accepted. Send removes hosts per
+			// successful batch; on error the remainder stays in the set.
+			var before []fleet.PolicySetHost
+			if _, ok := packetfence.PfEventTypeForPolicy(policy.ID); ok {
+				var err error
+				before, err = failingPoliciesSet.ListHosts(policy.ID)
+				if err != nil {
+					logger.WarnContext(ctx, "failed to list hosts before pf fire", "policy_id", policy.ID, "err", err)
+					before = nil
+				}
+			}
+			firedAt := time.Now()
+			sendErr := webhooks.SendFailingPoliciesBatchedPOSTs(
+				ctx, policy, failingPoliciesSet, cfg.HostBatchSize, serverURL, cfg.WebhookURL, firedAt, logger, newActivitySvc)
+			if len(before) > 0 {
+				sent := before
+				if sendErr != nil {
+					// Partial success: earlier batches were removed before
+					// the failure. Record only hosts no longer in the set.
+					after, err := failingPoliciesSet.ListHosts(policy.ID)
+					if err != nil {
+						logger.WarnContext(ctx, "failed to list hosts after pf fire", "policy_id", policy.ID, "err", err)
+					} else {
+						remaining := make(map[uint]bool, len(after))
+						for _, h := range after {
+							remaining[h.ID] = true
+						}
+						sent = sent[:0]
+						for _, h := range before {
+							if !remaining[h.ID] {
+								sent = append(sent, h)
+							}
+						}
+					}
+				}
+				ids := make([]uint, 0, len(sent))
+				for _, h := range sent {
+					ids = append(ids, h.ID)
+				}
+				packetfence.RecordPolicyFireBatch(ctx, ds, logger, policy.ID, ids, firedAt)
+			}
+			return sendErr
 
 		case policies.FailingPolicyJira:
 			hosts, err := failingPoliciesSet.ListHosts(policy.ID)

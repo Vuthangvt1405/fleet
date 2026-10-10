@@ -68,6 +68,8 @@ type GetBlockFunc func(ctx context.Context, metadata *fleet.CarveMetadata, block
 
 type CleanupCarvesFunc func(ctx context.Context, now time.Time) (expired int, err error)
 
+type UpsertPfRevocationFindingFunc func(ctx context.Context, f *fleet.PfRevocationFinding) (*fleet.PfRevocationFinding, error)
+
 type ListPfRevocationDueFunc func(ctx context.Context, now time.Time, limit int) ([]*fleet.PfRevocationFinding, error)
 
 type ListPfRevocationGroupFunc func(ctx context.Context, hostMAC string, pfEventType string) ([]*fleet.PfRevocationFinding, error)
@@ -2640,6 +2642,9 @@ type DataStore struct {
 
 	CleanupCarvesFunc        CleanupCarvesFunc
 	CleanupCarvesFuncInvoked bool
+
+	UpsertPfRevocationFindingFunc        UpsertPfRevocationFindingFunc
+	UpsertPfRevocationFindingFuncInvoked bool
 
 	ListPfRevocationDueFunc        ListPfRevocationDueFunc
 	ListPfRevocationDueFuncInvoked bool
@@ -6555,6 +6560,13 @@ func (s *DataStore) CleanupCarves(ctx context.Context, now time.Time) (expired i
 	s.CleanupCarvesFuncInvoked = true
 	s.mu.Unlock()
 	return s.CleanupCarvesFunc(ctx, now)
+}
+
+func (s *DataStore) UpsertPfRevocationFinding(ctx context.Context, f *fleet.PfRevocationFinding) (*fleet.PfRevocationFinding, error) {
+	s.mu.Lock()
+	s.UpsertPfRevocationFindingFuncInvoked = true
+	s.mu.Unlock()
+	return s.UpsertPfRevocationFindingFunc(ctx, f)
 }
 
 func (s *DataStore) ListPfRevocationDue(ctx context.Context, now time.Time, limit int) ([]*fleet.PfRevocationFinding, error) {
