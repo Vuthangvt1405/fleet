@@ -17,13 +17,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The raw MySQL datastore implements these contracts without adding them to
-// fleet.Datastore. Keeping this assertion here also protects the wiring test
-// against accidentally testing only a fake implementation.
+// The raw MySQL datastore implements the PacketFence contracts as part of
+// fleet.Datastore, so the decorators promote them to the fully wrapped
+// datastore handed to cron. These assertions pin both ends of that promise.
 var (
 	_ packetfence.LedgerStore   = (*mysql.Datastore)(nil)
 	_ packetfence.PolicyChecker = (*mysql.Datastore)(nil)
 	_ packetfence.CVEChecker    = (*mysql.Datastore)(nil)
+	_ fleet.PacketFenceStore    = (*mysql.Datastore)(nil)
+)
+
+// fleet.Datastore itself must satisfy the reconciler's narrow contracts;
+// otherwise the cron type assertions can fail on a valid datastore.
+var (
+	_ packetfence.LedgerStore   = (fleet.Datastore)(nil)
+	_ packetfence.PolicyChecker = (fleet.Datastore)(nil)
+	_ packetfence.CVEChecker    = (fleet.Datastore)(nil)
 )
 
 func TestPacketFenceDatastoreWrappedForCron(t *testing.T) {
@@ -34,19 +43,16 @@ func TestPacketFenceDatastoreWrappedForCron(t *testing.T) {
 	}{
 		{"ETag off", false},
 		{"ETag on", true},
-		{"ETag invalidation fallback", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Match the initRedis construction order, with the actual MySQL
 			// datastore and production decorators (no database/Redis I/O needed).
 			raw := &mysql.Datastore{}
 			redisDS := mysqlredis.New(cached_mysql.New(raw), nil)
-			var fullyWrapped fleet.Datastore = redisDS
+			var ds fleet.Datastore = redisDS
 			if tc.etag {
-				fullyWrapped = etag_invalidate.New(redisDS, nil, logger)
+				ds = etag_invalidate.New(redisDS, nil, logger)
 			}
-			ds := withPacketFenceStore(fullyWrapped, raw)
-			assert.Same(t, fullyWrapped, ds.(*packetFenceDatastore).Datastore)
 			_, ok := ds.(packetfence.LedgerStore)
 			assert.True(t, ok)
 			_, ok = ds.(packetfence.PolicyChecker)
@@ -60,17 +66,6 @@ func TestPacketFenceDatastoreWrappedForCron(t *testing.T) {
 			require.NotNil(t, schedule)
 		})
 	}
-}
-
-func TestPacketFenceDatastoreDoesNotAdvertiseMissingCapabilities(t *testing.T) {
-	// A datastore without PacketFence contracts should still fail the
-	// existing cron registration checks, not panic later during a job.
-	var raw fleet.Datastore = &struct{ fleet.Datastore }{}
-	wrapped := mysqlredis.New(cached_mysql.New(raw), nil)
-	ds := withPacketFenceStore(wrapped, raw)
-	assert.Same(t, wrapped, ds)
-	_, err := newPacketFenceRevocationSchedule(context.Background(), "test", ds, slog.Default(), true)
-	require.ErrorContains(t, err, "does not support the packetfence revocation ledger")
 }
 
 type packetFenceForwardingStore struct {
@@ -109,26 +104,40 @@ func (s *packetFenceForwardingStore) CheckPfCVECompliance(context.Context, uint,
 }
 
 func TestPacketFenceDatastoreDelegatesAllCapabilities(t *testing.T) {
-	raw := &packetFenceForwardingStore{}
-	wrapped := mysqlredis.New(cached_mysql.New(raw), nil)
-	ds := withPacketFenceStore(wrapped, raw)
-	ledger := ds.(packetfence.LedgerStore)
-	policies := ds.(packetfence.PolicyChecker)
-	cves := ds.(packetfence.CVEChecker)
-	ctx := context.Background()
-	_, err := ledger.ListPfRevocationDue(ctx, time.Time{}, 1)
-	require.NoError(t, err)
-	_, err = ledger.ListPfRevocationGroup(ctx, "mac", "type")
-	require.NoError(t, err)
-	require.NoError(t, ledger.UpdatePfRevocationFinding(ctx, &fleet.PfRevocationFinding{}))
-	cleared, err := ledger.MarkPfGroupClearedFromClearing(ctx, "mac", "type", 1)
-	require.NoError(t, err)
-	require.True(t, cleared)
-	_, err = policies.CheckPfPolicyCompliance(ctx, 1, 2)
-	require.NoError(t, err)
-	_, err = cves.CheckPfCVECompliance(ctx, 1, "CVE-1", time.Time{})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"due", "group", "update", "clear", "policy", "cve"}, raw.called)
+	logger := slog.New(slog.DiscardHandler)
+	for _, tc := range []struct {
+		name string
+		etag bool
+	}{
+		{"ETag off", false},
+		{"ETag on", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := &packetFenceForwardingStore{}
+			redisDS := mysqlredis.New(cached_mysql.New(raw), nil)
+			var ds fleet.Datastore = redisDS
+			if tc.etag {
+				ds = etag_invalidate.New(redisDS, nil, logger)
+			}
+			ledger := ds.(packetfence.LedgerStore)
+			policies := ds.(packetfence.PolicyChecker)
+			cves := ds.(packetfence.CVEChecker)
+			ctx := context.Background()
+			_, err := ledger.ListPfRevocationDue(ctx, time.Time{}, 1)
+			require.NoError(t, err)
+			_, err = ledger.ListPfRevocationGroup(ctx, "mac", "type")
+			require.NoError(t, err)
+			require.NoError(t, ledger.UpdatePfRevocationFinding(ctx, &fleet.PfRevocationFinding{}))
+			cleared, err := ledger.MarkPfGroupClearedFromClearing(ctx, "mac", "type", 1)
+			require.NoError(t, err)
+			require.True(t, cleared)
+			_, err = policies.CheckPfPolicyCompliance(ctx, 1, 2)
+			require.NoError(t, err)
+			_, err = cves.CheckPfCVECompliance(ctx, 1, "CVE-1", time.Time{})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"due", "group", "update", "clear", "policy", "cve"}, raw.called)
+		})
+	}
 }
 
 // TestEffectiveRedisConfigETags pins the flag gating: the Redis short

@@ -13,32 +13,8 @@ import (
 	"github.com/fleetdm/fleet/v4/server/datastore/mysqlredis"
 	"github.com/fleetdm/fleet/v4/server/datastore/redis"
 	"github.com/fleetdm/fleet/v4/server/fleet"
-	"github.com/fleetdm/fleet/v4/server/service/packetfence"
 	"github.com/fleetdm/fleet/v4/server/service/redis_config_etag"
 )
-
-// packetFenceDatastore preserves the reconciler's narrow MySQL capabilities
-// alongside the fully wrapped fleet.Datastore. The caching, Redis and ETag
-// decorators embed fleet.Datastore, which does not declare these methods.
-// PacketFence operations do not affect cached client configuration.
-type packetFenceDatastore struct {
-	fleet.Datastore
-	packetfence.LedgerStore
-	packetfence.PolicyChecker
-	packetfence.CVEChecker
-}
-
-func withPacketFenceStore(wrapped, underlying fleet.Datastore) fleet.Datastore {
-	ledger, hasLedger := underlying.(packetfence.LedgerStore)
-	policies, hasPolicies := underlying.(packetfence.PolicyChecker)
-	cves, hasCVEs := underlying.(packetfence.CVEChecker)
-	if !hasLedger || !hasPolicies || !hasCVEs {
-		// Leave the cron registration's capability checks to report the missing
-		// contract instead of advertising methods that cannot be called.
-		return wrapped
-	}
-	return &packetFenceDatastore{wrapped, ledger, policies, cves}
-}
 
 // buildRedisPoolConfig translates the Fleet Redis config into the redis
 // package's PoolConfig. The address has its "redis://" scheme stripped so
@@ -165,7 +141,7 @@ func initRedis(
 	// above). The etag_invalidate wrapper is outside the caching layers so
 	// it sees every config-affecting write through fleet.Datastore.
 	if !effectiveRedisConfigETags(cfg) {
-		return redisPool, withPacketFenceStore(redisWrapperDS, ds), redisWrapperDS, nil
+		return redisPool, redisWrapperDS, redisWrapperDS, nil
 	}
 
 	configETagStore := redis_config_etag.New(redisPool, logger.With("component", "config-etag"))
@@ -180,10 +156,10 @@ func initRedis(
 	if err := configETagStore.Invalidate(ctx); err != nil {
 		logger.ErrorContext(ctx, "config etag: startup generation bump failed; short circuit disabled for this boot",
 			"component", "config-etag", "err", err)
-		return redisPool, withPacketFenceStore(redisWrapperDS, ds), redisWrapperDS, nil
+		return redisPool, redisWrapperDS, redisWrapperDS, nil
 	}
 
 	etagDS := etag_invalidate.New(redisWrapperDS, configETagStore, logger.With("component", "etag-invalidate"))
 
-	return redisPool, withPacketFenceStore(etagDS, ds), redisWrapperDS, configETagStore
+	return redisPool, etagDS, redisWrapperDS, configETagStore
 }

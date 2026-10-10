@@ -85,7 +85,8 @@ func ConfigFromAppConfig(p *fleet.PacketFenceIntegration) Config {
 }
 
 // LedgerStore is the narrow persistence contract the reconciler needs. It is
-// satisfied by *mysql.Datastore without extending fleet.Datastore.
+// part of fleet.Datastore (see fleet.PacketFenceStore) so the datastore
+// decorators promote it to the fully wrapped datastore handed to cron.
 type LedgerStore interface {
 	ListPfRevocationDue(ctx context.Context, now time.Time, limit int) ([]*fleet.PfRevocationFinding, error)
 	ListPfRevocationGroup(ctx context.Context, hostMAC, pfEventType string) ([]*fleet.PfRevocationFinding, error)
