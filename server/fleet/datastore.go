@@ -68,6 +68,7 @@ type Datastore interface {
 	health.Checker
 
 	CarveStore
+	PacketFenceStore
 
 	///////////////////////////////////////////////////////////////////////////////
 	// UserStore contains methods for managing users in a datastore

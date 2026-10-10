@@ -68,6 +68,18 @@ type GetBlockFunc func(ctx context.Context, metadata *fleet.CarveMetadata, block
 
 type CleanupCarvesFunc func(ctx context.Context, now time.Time) (expired int, err error)
 
+type ListPfRevocationDueFunc func(ctx context.Context, now time.Time, limit int) ([]*fleet.PfRevocationFinding, error)
+
+type ListPfRevocationGroupFunc func(ctx context.Context, hostMAC string, pfEventType string) ([]*fleet.PfRevocationFinding, error)
+
+type UpdatePfRevocationFindingFunc func(ctx context.Context, f *fleet.PfRevocationFinding) error
+
+type MarkPfGroupClearedFromClearingFunc func(ctx context.Context, hostMAC string, pfEventType string, expected int64) (bool, error)
+
+type CheckPfPolicyComplianceFunc func(ctx context.Context, hostID uint, policyID uint) (fleet.PfObservation, error)
+
+type CheckPfCVEComplianceFunc func(ctx context.Context, hostID uint, cve string, firedAt time.Time) (fleet.PfObservation, error)
+
 type NewUserFunc func(ctx context.Context, user *fleet.User) (*fleet.User, error)
 
 type HasUsersFunc func(ctx context.Context) (bool, error)
@@ -2628,6 +2640,24 @@ type DataStore struct {
 
 	CleanupCarvesFunc        CleanupCarvesFunc
 	CleanupCarvesFuncInvoked bool
+
+	ListPfRevocationDueFunc        ListPfRevocationDueFunc
+	ListPfRevocationDueFuncInvoked bool
+
+	ListPfRevocationGroupFunc        ListPfRevocationGroupFunc
+	ListPfRevocationGroupFuncInvoked bool
+
+	UpdatePfRevocationFindingFunc        UpdatePfRevocationFindingFunc
+	UpdatePfRevocationFindingFuncInvoked bool
+
+	MarkPfGroupClearedFromClearingFunc        MarkPfGroupClearedFromClearingFunc
+	MarkPfGroupClearedFromClearingFuncInvoked bool
+
+	CheckPfPolicyComplianceFunc        CheckPfPolicyComplianceFunc
+	CheckPfPolicyComplianceFuncInvoked bool
+
+	CheckPfCVEComplianceFunc        CheckPfCVEComplianceFunc
+	CheckPfCVEComplianceFuncInvoked bool
 
 	NewUserFunc        NewUserFunc
 	NewUserFuncInvoked bool
@@ -6525,6 +6555,48 @@ func (s *DataStore) CleanupCarves(ctx context.Context, now time.Time) (expired i
 	s.CleanupCarvesFuncInvoked = true
 	s.mu.Unlock()
 	return s.CleanupCarvesFunc(ctx, now)
+}
+
+func (s *DataStore) ListPfRevocationDue(ctx context.Context, now time.Time, limit int) ([]*fleet.PfRevocationFinding, error) {
+	s.mu.Lock()
+	s.ListPfRevocationDueFuncInvoked = true
+	s.mu.Unlock()
+	return s.ListPfRevocationDueFunc(ctx, now, limit)
+}
+
+func (s *DataStore) ListPfRevocationGroup(ctx context.Context, hostMAC string, pfEventType string) ([]*fleet.PfRevocationFinding, error) {
+	s.mu.Lock()
+	s.ListPfRevocationGroupFuncInvoked = true
+	s.mu.Unlock()
+	return s.ListPfRevocationGroupFunc(ctx, hostMAC, pfEventType)
+}
+
+func (s *DataStore) UpdatePfRevocationFinding(ctx context.Context, f *fleet.PfRevocationFinding) error {
+	s.mu.Lock()
+	s.UpdatePfRevocationFindingFuncInvoked = true
+	s.mu.Unlock()
+	return s.UpdatePfRevocationFindingFunc(ctx, f)
+}
+
+func (s *DataStore) MarkPfGroupClearedFromClearing(ctx context.Context, hostMAC string, pfEventType string, expected int64) (bool, error) {
+	s.mu.Lock()
+	s.MarkPfGroupClearedFromClearingFuncInvoked = true
+	s.mu.Unlock()
+	return s.MarkPfGroupClearedFromClearingFunc(ctx, hostMAC, pfEventType, expected)
+}
+
+func (s *DataStore) CheckPfPolicyCompliance(ctx context.Context, hostID uint, policyID uint) (fleet.PfObservation, error) {
+	s.mu.Lock()
+	s.CheckPfPolicyComplianceFuncInvoked = true
+	s.mu.Unlock()
+	return s.CheckPfPolicyComplianceFunc(ctx, hostID, policyID)
+}
+
+func (s *DataStore) CheckPfCVECompliance(ctx context.Context, hostID uint, cve string, firedAt time.Time) (fleet.PfObservation, error) {
+	s.mu.Lock()
+	s.CheckPfCVEComplianceFuncInvoked = true
+	s.mu.Unlock()
+	return s.CheckPfCVEComplianceFunc(ctx, hostID, cve, firedAt)
 }
 
 func (s *DataStore) NewUser(ctx context.Context, user *fleet.User) (*fleet.User, error) {

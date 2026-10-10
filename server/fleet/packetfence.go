@@ -1,6 +1,9 @@
 package fleet
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // PacketFence revocation ledger trigger types.
 const (
@@ -79,4 +82,17 @@ type PfObservation struct {
 	Outcome       PfOutcome
 	ObservationID string
 	ObservedAt    time.Time
+}
+
+// PacketFenceStore is the persistence contract for the PacketFence revocation
+// worker: ledger reads/writes plus policy and CVE compliance observations.
+// It is part of Datastore so the caching, Redis and ETag decorators promote
+// these methods to the fully wrapped datastore handed to cron.
+type PacketFenceStore interface {
+	ListPfRevocationDue(ctx context.Context, now time.Time, limit int) ([]*PfRevocationFinding, error)
+	ListPfRevocationGroup(ctx context.Context, hostMAC, pfEventType string) ([]*PfRevocationFinding, error)
+	UpdatePfRevocationFinding(ctx context.Context, f *PfRevocationFinding) error
+	MarkPfGroupClearedFromClearing(ctx context.Context, hostMAC, pfEventType string, expected int64) (bool, error)
+	CheckPfPolicyCompliance(ctx context.Context, hostID, policyID uint) (PfObservation, error)
+	CheckPfCVECompliance(ctx context.Context, hostID uint, cve string, firedAt time.Time) (PfObservation, error)
 }

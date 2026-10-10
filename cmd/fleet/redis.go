@@ -138,8 +138,8 @@ func initRedis(
 
 	// Config ETag store + invalidation hooks, wired ONLY when the short
 	// circuit is effectively enabled (see the NO ETAG REDIS I/O notice
-	// above). The etag_invalidate wrapper is OUTERMOST so it sees every
-	// config-affecting write regardless of the inner caching layers.
+	// above). The etag_invalidate wrapper is outside the caching layers so
+	// it sees every config-affecting write through fleet.Datastore.
 	if !effectiveRedisConfigETags(cfg) {
 		return redisPool, redisWrapperDS, redisWrapperDS, nil
 	}
