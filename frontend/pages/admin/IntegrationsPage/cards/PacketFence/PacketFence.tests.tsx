@@ -23,7 +23,7 @@ jest.mock("components/ToastNotification", () => ({
 
 const defaultProps: IAppConfigFormProps = {
   appConfig: createMockConfig({
-    license: createMockLicense({ tier: "premium" }),
+    license: createMockLicense({ tier: "free" }),
   }),
   handleSubmit: jest.fn() as IAppConfigFormProps["handleSubmit"],
   router: createMockRouter(),
@@ -32,7 +32,7 @@ const defaultProps: IAppConfigFormProps = {
 const savedConfigProps: IAppConfigFormProps = {
   ...defaultProps,
   appConfig: createMockConfig({
-    license: createMockLicense({ tier: "premium" }),
+    license: createMockLicense({ tier: "free" }),
     integrations: {
       ...createMockConfig().integrations,
       packetfence: {
@@ -71,7 +71,7 @@ describe("PacketFence", () => {
     expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
   });
 
-  it("renders premium message on free tier", () => {
+  it("renders the form on free tier (no premium gate)", () => {
     render(
       <PacketFence
         {...defaultProps}
@@ -80,8 +80,9 @@ describe("PacketFence", () => {
         })}
       />
     );
+    expect(screen.getByLabelText(/packetfence url/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/This feature is included in Fleet Premium/i)
+      screen.getByRole("button", { name: /test connection/i })
     ).toBeInTheDocument();
   });
 

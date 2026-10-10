@@ -8,18 +8,15 @@ import Slider from "components/forms/fields/Slider";
 import validUrl from "components/forms/validators/valid_url";
 import GitOpsModeTooltipWrapper from "components/GitOpsModeTooltipWrapper";
 import PageDescription from "components/PageDescription";
-import PremiumFeatureMessage from "components/PremiumFeatureMessage/PremiumFeatureMessage";
 import SectionHeader from "components/SectionHeader";
 import { notify } from "components/ToastNotification";
 import TooltipWrapper from "components/TooltipWrapper";
 import { getErrorReason } from "interfaces/errors";
 import { IInputFieldParseTarget } from "interfaces/form_field";
 import { IPacketFenceIntegration } from "interfaces/integration";
-import SettingsSection from "pages/admin/components/SettingsSection";
 import configAPI from "services/entities/config";
 import packetfenceAPI from "services/entities/packetfence";
 import { UNCHANGED_PASSWORD_API_RESPONSE } from "utilities/constants";
-import { isPremiumTier } from "utilities/permissions/permissions";
 
 import { IAppConfigFormProps } from "../../../OrgSettingsPage/cards/constants";
 
@@ -141,14 +138,6 @@ const PacketFence = ({ appConfig }: IAppConfigFormProps): JSX.Element => {
     setFormData(toFormData(appConfig.integrations.packetfence));
     setConnection({ state: "untested" });
   }, [appConfig]);
-
-  if (!isPremiumTier(appConfig)) {
-    return (
-      <SettingsSection title="PacketFence">
-        <PremiumFeatureMessage />
-      </SettingsSection>
-    );
-  }
 
   const gomEnabled = appConfig.gitops.gitops_mode_enabled;
 
