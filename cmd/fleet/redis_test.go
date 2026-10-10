@@ -88,6 +88,11 @@ func (s *packetFenceForwardingStore) UpdatePfRevocationFinding(context.Context, 
 	return nil
 }
 
+func (s *packetFenceForwardingStore) UpsertPfRevocationFinding(_ context.Context, f *fleet.PfRevocationFinding) (*fleet.PfRevocationFinding, error) {
+	s.called = append(s.called, "upsert")
+	return f, nil
+}
+
 func (s *packetFenceForwardingStore) MarkPfGroupClearedFromClearing(context.Context, string, string, int64) (bool, error) {
 	s.called = append(s.called, "clear")
 	return true, nil
@@ -122,6 +127,7 @@ func TestPacketFenceDatastoreDelegatesAllCapabilities(t *testing.T) {
 			ledger := ds.(packetfence.LedgerStore)
 			policies := ds.(packetfence.PolicyChecker)
 			cves := ds.(packetfence.CVEChecker)
+			fire := ds.(fleet.PacketFenceStore)
 			ctx := context.Background()
 			_, err := ledger.ListPfRevocationDue(ctx, time.Time{}, 1)
 			require.NoError(t, err)
@@ -135,7 +141,9 @@ func TestPacketFenceDatastoreDelegatesAllCapabilities(t *testing.T) {
 			require.NoError(t, err)
 			_, err = cves.CheckPfCVECompliance(ctx, 1, "CVE-1", time.Time{})
 			require.NoError(t, err)
-			assert.Equal(t, []string{"due", "group", "update", "clear", "policy", "cve"}, raw.called)
+			_, err = fire.UpsertPfRevocationFinding(ctx, &fleet.PfRevocationFinding{})
+			require.NoError(t, err)
+			assert.Equal(t, []string{"due", "group", "update", "clear", "policy", "cve", "upsert"}, raw.called)
 		})
 	}
 }

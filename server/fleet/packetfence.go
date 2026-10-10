@@ -89,6 +89,7 @@ type PfObservation struct {
 // It is part of Datastore so the caching, Redis and ETag decorators promote
 // these methods to the fully wrapped datastore handed to cron.
 type PacketFenceStore interface {
+	UpsertPfRevocationFinding(ctx context.Context, f *PfRevocationFinding) (*PfRevocationFinding, error)
 	ListPfRevocationDue(ctx context.Context, now time.Time, limit int) ([]*PfRevocationFinding, error)
 	ListPfRevocationGroup(ctx context.Context, hostMAC, pfEventType string) ([]*PfRevocationFinding, error)
 	UpdatePfRevocationFinding(ctx context.Context, f *PfRevocationFinding) error
