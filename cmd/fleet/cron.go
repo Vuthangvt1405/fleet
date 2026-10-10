@@ -39,6 +39,7 @@ import (
 	"github.com/fleetdm/fleet/v4/server/policies"
 	"github.com/fleetdm/fleet/v4/server/service"
 	"github.com/fleetdm/fleet/v4/server/service/externalsvc"
+	"github.com/fleetdm/fleet/v4/server/service/packetfence"
 	"github.com/fleetdm/fleet/v4/server/service/schedule"
 	androidvuln "github.com/fleetdm/fleet/v4/server/vulnerabilities/android"
 	"github.com/fleetdm/fleet/v4/server/vulnerabilities/customcve"
@@ -3173,6 +3174,66 @@ func newEndUserNotificationsSchedule(
 		}),
 		schedule.WithJob("remind_and_install_due_patches", func(ctx context.Context) error {
 			return patchNotificationKind.RemindAndInstallDuePatches(ctx)
+		}),
+	)
+
+	return s, nil
+}
+
+func newPacketFenceRevocationSchedule(
+	ctx context.Context,
+	instanceID string,
+	ds fleet.Datastore,
+	logger *slog.Logger,
+	premium bool,
+) (*schedule.Schedule, error) {
+	const name = string(fleet.CronPacketFenceRevocation)
+
+	interval := 5 * time.Minute
+	if raw := os.Getenv("FLEET_PACKETFENCE_INTERVAL"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d <= 0 {
+			return nil, fmt.Errorf("invalid FLEET_PACKETFENCE_INTERVAL %q: %w", raw, err)
+		}
+		interval = d
+	}
+
+	store, ok := ds.(packetfence.LedgerStore)
+	if !ok {
+		return nil, errors.New("datastore does not support the packetfence revocation ledger")
+	}
+	policies, ok := ds.(packetfence.PolicyChecker)
+	if !ok {
+		return nil, errors.New("datastore does not support packetfence policy checks")
+	}
+	cves, ok := ds.(packetfence.CVEChecker)
+	if !ok {
+		return nil, errors.New("datastore does not support packetfence CVE checks")
+	}
+	logger = logger.With("cron", name)
+	s := schedule.New(
+		ctx, name, instanceID, interval, ds, ds,
+		schedule.WithLogger(logger),
+		schedule.WithJob("packetfence_revocation_reconcile", func(ctx context.Context) error {
+			if !premium {
+				return nil
+			}
+			appConfig, err := ds.AppConfig(ctx)
+			if err != nil {
+				return err
+			}
+			cfg := packetfence.ConfigFromAppConfig(appConfig.Integrations.PacketFence)
+			if !cfg.Enabled {
+				return nil
+			}
+			pfClient, err := externalsvc.NewPacketFenceClient(&externalsvc.PacketFenceOptions{
+				BaseURL: cfg.BaseURL, Username: cfg.Username, Password: cfg.Password,
+			})
+			if err != nil {
+				return fmt.Errorf("packetfence client: %w", err)
+			}
+			r := packetfence.NewReconciler(cfg, store, policies, cves, pfClient, logger)
+			return r.RunOnce(ctx)
 		}),
 	)
 

@@ -441,6 +441,11 @@ func registerMiscCrons(ctx context.Context, deps cronSchedulesDeps) {
 	deps.register("failed to register batch activity completion checker schedule", func() (fleet.CronSchedule, error) {
 		return newBatchActivityCompletionCheckerSchedule(ctx, deps.instanceID, deps.ds, deps.logger)
 	})
+
+	// Register even before setup; the job reads current AppConfig every run.
+	deps.register("failed to register packetfence revocation schedule", func() (fleet.CronSchedule, error) {
+		return newPacketFenceRevocationSchedule(ctx, deps.instanceID, deps.ds, deps.logger, deps.license != nil && deps.license.IsPremium())
+	})
 }
 
 // legacyAPNsPusherInterval reads FLEET_MDM_APPLE_LEGACY_APNS_PUSHER_INTERVAL,
