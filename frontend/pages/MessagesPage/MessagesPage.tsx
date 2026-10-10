@@ -14,6 +14,7 @@ import {
 } from "interfaces/message";
 import messagesAPI from "services/entities/messages";
 
+import AutomationMessageEditor from "./components/AutomationMessageEditor";
 import SendMessageForm from "./components/SendMessageForm";
 import MessagesTable from "./MessagesTable";
 
@@ -128,6 +129,7 @@ const MessagesPage = (): JSX.Element => {
           />
         </div>
       )}
+      <AutomationMessageEditor canEdit={isGlobalAdmin} />
       {renderHistory()}
     </MainContent>
   );
