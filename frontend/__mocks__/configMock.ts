@@ -151,6 +151,7 @@ const DEFAULT_CONFIG_MOCK: IConfig = {
   agent_options: "",
   license: DEFAULT_LICENSE_MOCK,
   webhook_settings: {
+    interval: "24h0m0s",
     host_status_webhook: {
       enable_host_status_webhook: true,
       destination_url: "https://server.com",

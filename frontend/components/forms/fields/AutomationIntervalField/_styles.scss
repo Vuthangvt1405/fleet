@@ -1,0 +1,22 @@
+.automation-interval-field {
+  &__controls {
+    display: flex;
+    align-items: flex-start;
+    gap: $pad-smedium;
+  }
+
+  &__amount {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  // The unit dropdown renders its own .form-field wrapper (width: 100% by
+  // default), so constrain it with flex-basis instead of width.
+  &__unit {
+    flex: 0 0 px-to-rem(160);
+
+    .dropdown__select {
+      width: 100%;
+    }
+  }
+}

@@ -238,6 +238,8 @@ const AutomationsModal = ({
               automationsConfig={automationsConfig}
               availableIntegrations={availableIntegrations}
               gitOpsModeEnabled={gitOpsModeEnabled}
+              globalWebhookInterval={globalConfig?.webhook_settings?.interval}
+              isGlobalScope={isAllTeamsSelected}
             />
           </section>
 

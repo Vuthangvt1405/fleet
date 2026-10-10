@@ -5,6 +5,7 @@ import { InjectedRouter } from "react-router";
 import Button from "components/buttons/Button";
 import RevealButton from "components/buttons/RevealButton";
 import CustomLink from "components/CustomLink";
+import AutomationIntervalField from "components/forms/fields/AutomationIntervalField";
 // @ts-ignore
 import Dropdown from "components/forms/fields/Dropdown";
 import InputField from "components/forms/fields/InputField";
@@ -20,6 +21,13 @@ import {
 } from "interfaces/integration";
 import { ITeamAutomationsConfig } from "interfaces/team";
 import PATHS from "router/paths";
+import {
+  DEFAULT_WEBHOOK_INTERVAL,
+  formatWebhookInterval,
+  parseWebhookInterval,
+  validateWebhookInterval,
+  WebhookIntervalUnit,
+} from "utilities/webhook_interval";
 
 import { IAutomationFormHandle } from "../../types";
 
@@ -29,7 +37,10 @@ import ExampleTicket from "./ExampleTicket";
 const baseClass = "other-workflows-modal";
 
 export interface IOtherWorkflowsModalSubmit {
-  webhook_settings: Pick<IWebhookSettings, "failing_policies_webhook">;
+  webhook_settings: Pick<
+    IWebhookSettings,
+    "failing_policies_webhook" | "interval"
+  >;
   integrations: IGlobalIntegrations | ITeamIntegrations;
 }
 
@@ -38,6 +49,17 @@ interface IOtherWorkflowsModalProps {
   automationsConfig: IAutomationsConfig | ITeamAutomationsConfig;
   availableIntegrations: IGlobalIntegrations | ITeamIntegrations;
   gitOpsModeEnabled?: boolean;
+  /**
+   * The raw global `webhook_settings.interval` (a Go duration string). The
+   * automations schedule is global, so team scopes display it read-only.
+   */
+  globalWebhookInterval?: string;
+  /**
+   * True when saving writes the global config ("All fleets" view), where the
+   * interval can be edited and submitted. Team payloads have no interval
+   * field, so it must not be sent outside this scope.
+   */
+  isGlobalScope?: boolean;
 }
 
 const findEnabledIntegration = ({
@@ -72,12 +94,18 @@ const OtherWorkflowsModal = forwardRef<
       automationsConfig,
       availableIntegrations,
       gitOpsModeEnabled = false,
+      globalWebhookInterval,
+      isGlobalScope = false,
     }: IOtherWorkflowsModalProps,
     ref
   ) => {
     const {
       webhook_settings: { failing_policies_webhook: webhook },
     } = automationsConfig;
+
+    // The interval drives the shared global automations cron, so it is only
+    // editable (and submitted) for the global config outside GitOps mode.
+    const canEditInterval = isGlobalScope && !gitOpsModeEnabled;
 
     const { jira, zendesk } = availableIntegrations || {};
     const allIntegrations: IIntegration[] = [];
@@ -111,6 +139,14 @@ const OtherWorkflowsModal = forwardRef<
       initialIsWebhookEnabled
     );
     const [destinationUrl, setDestinationUrl] = useState(initialDestinationUrl);
+    const initialInterval =
+      parseWebhookInterval(globalWebhookInterval) ?? DEFAULT_WEBHOOK_INTERVAL;
+    const [intervalAmount, setIntervalAmount] = useState(
+      `${initialInterval.amount}`
+    );
+    const [intervalUnit, setIntervalUnit] = useState<WebhookIntervalUnit>(
+      initialInterval.unit
+    );
     const [selectedIntegration, setSelectedIntegration] = useState<
       IIntegration | undefined
     >(serverEnabledIntegration);
@@ -145,6 +181,11 @@ const OtherWorkflowsModal = forwardRef<
           enable_failing_policies_webhook:
             isPolicyAutomationsEnabled && isWebhookEnabled,
         },
+        // Team webhook settings have no interval field; the global schedule
+        // is only submitted when it could actually have been edited.
+        ...(canEditInterval && {
+          interval: formatWebhookInterval(intervalAmount, intervalUnit),
+        }),
       };
 
       return {
@@ -173,6 +214,18 @@ const OtherWorkflowsModal = forwardRef<
           }
         }
       }
+      // Only validate a field the user can actually edit — a bad value set
+      // via GitOps YAML must not block saving unrelated fields (and team
+      // scopes can't change the global interval at all).
+      if (canEditInterval) {
+        const intervalError = validateWebhookInterval(
+          intervalAmount,
+          intervalUnit
+        );
+        if (intervalError) {
+          newErrors.interval = intervalError;
+        }
+      }
       return newErrors;
     };
 
@@ -185,6 +238,12 @@ const OtherWorkflowsModal = forwardRef<
       },
       isDirty: () => {
         if (isPolicyAutomationsEnabled !== initialIsPolicyAutomationsEnabled)
+          return true;
+        if (
+          canEditInterval &&
+          (intervalAmount !== `${initialInterval.amount}` ||
+            intervalUnit !== initialInterval.unit)
+        )
           return true;
         if (isPolicyAutomationsEnabled) {
           if (isWebhookEnabled !== !!initialIsWebhookEnabled) return true;
@@ -206,6 +265,33 @@ const OtherWorkflowsModal = forwardRef<
     const onChangeUrl = (value: string) => {
       setDestinationUrl(value);
       setErrors((errs) => omit(errs, "url"));
+    };
+
+    const onChangeIntervalAmount = (value: string) => {
+      setIntervalAmount(value);
+      setErrors((errs) => omit(errs, "interval"));
+    };
+
+    const onChangeIntervalUnit = (value: WebhookIntervalUnit) => {
+      setIntervalUnit(value);
+      setErrors((errs) => omit(errs, "interval"));
+    };
+
+    const onBlurIntervalAmount = () => {
+      // Skip validation when the field is disabled (team scope or GitOps
+      // mode) so we don't surface an error on a control the user can't edit.
+      // This must mirror the AutomationIntervalField's `disabled` condition.
+      if (!canEditInterval) {
+        return;
+      }
+      const intervalError = validateWebhookInterval(
+        intervalAmount,
+        intervalUnit
+      );
+      setErrors((errs) => {
+        const next = omit(errs, "interval");
+        return intervalError ? { ...next, interval: intervalError } : next;
+      });
     };
 
     const onBlurUrl = () => {
@@ -367,6 +453,20 @@ const OtherWorkflowsModal = forwardRef<
           </div>
           {isWebhookEnabled ? renderWebhook() : renderIntegrations()}
         </div>
+        <AutomationIntervalField
+          amount={intervalAmount}
+          unit={intervalUnit}
+          onAmountChange={onChangeIntervalAmount}
+          onUnitChange={onChangeIntervalUnit}
+          onBlur={onBlurIntervalAmount}
+          error={errors.interval}
+          disabled={!canEditInterval}
+          helpText={
+            isGlobalScope
+              ? "How often Fleet checks whether to send webhooks. This interval is shared with host status alerts."
+              : "How often Fleet checks whether to send webhooks. This interval is set globally and applies to all teams."
+          }
+        />
         {isWebhookEnabled && (
           <>
             <RevealButton
