@@ -87,6 +87,7 @@ func TestRecordPolicyFireWritesLedger(t *testing.T) {
 		7: {PrimaryMac: "50:54:46:00:5D:00"},
 	}}
 	fired := time.Now()
+	ds.hosts[7].PolicyUpdatedAt = fired.Add(-time.Minute)
 	finding, err := RecordPolicyFire(context.Background(), ds, 2, 7, fired)
 	require.NoError(t, err)
 	require.NotNil(t, finding)
@@ -100,7 +101,25 @@ func TestRecordPolicyFireWritesLedger(t *testing.T) {
 	require.Equal(t, uint(2), *f.PolicyID)
 	require.Equal(t, "3500001", f.PfEventType)
 	require.Equal(t, fleet.PfStatePendingDiscovery, f.State)
+	require.NotNil(t, f.FireID)
 	require.True(t, f.FiredAt.Equal(fired))
+}
+
+func TestRecordPolicyFireOccurrenceIDTracksPolicyReport(t *testing.T) {
+	reportAt := time.Now().UTC().Truncate(time.Second)
+	ds := &fakeFireStore{hosts: map[uint]*fleet.Host{
+		7: {PrimaryMac: "50:54:46:00:5D:00", PolicyUpdatedAt: reportAt},
+	}}
+	first, err := RecordPolicyFire(context.Background(), ds, 2, 7, reportAt.Add(time.Second))
+	require.NoError(t, err)
+	retry, err := RecordPolicyFire(context.Background(), ds, 2, 7, reportAt.Add(2*time.Second))
+	require.NoError(t, err)
+	require.Equal(t, *first.FireID, *retry.FireID)
+
+	ds.hosts[7].PolicyUpdatedAt = reportAt.Add(time.Minute)
+	newOccurrence, err := RecordPolicyFire(context.Background(), ds, 2, 7, reportAt.Add(time.Minute))
+	require.NoError(t, err)
+	require.NotEqual(t, *first.FireID, *newOccurrence.FireID)
 }
 
 func TestRecordPolicyFireIgnoresUnmappedPolicy(t *testing.T) {
@@ -165,4 +184,23 @@ func TestQueuePolicyFireNotificationIncludesReasonAndIsIdempotent(t *testing.T) 
 
 	require.NoError(t, QueuePolicyFireNotification(context.Background(), creator, finding, policy, settings, firedAt))
 	require.Equal(t, queued.UUID, creator.notifications[1].UUID)
+}
+
+func TestQueuePolicyFireNotificationUsesFireOccurrence(t *testing.T) {
+	creator := &fakeNotificationCreator{}
+	resolution := "Turn on Windows Firewall."
+	policy := &fleet.Policy{PolicyData: fleet.PolicyData{ID: 2, Name: "Firewall enabled", Resolution: &resolution}}
+	settings := &fleet.PacketFenceIntegration{NotifyEndUsers: true}
+	firedAt := time.Now().UTC()
+	fireID := "fire-one"
+	finding := &fleet.PfRevocationFinding{ID: 501, HostID: 7, FireID: &fireID}
+
+	require.NoError(t, QueuePolicyFireNotification(context.Background(), creator, finding, policy, settings, firedAt))
+	require.NoError(t, QueuePolicyFireNotification(context.Background(), creator, finding, policy, settings, firedAt))
+	fireID = "fire-two"
+	require.NoError(t, QueuePolicyFireNotification(context.Background(), creator, finding, policy, settings, firedAt))
+
+	require.Len(t, creator.notifications, 3)
+	require.Equal(t, creator.notifications[0].UUID, creator.notifications[1].UUID)
+	require.NotEqual(t, creator.notifications[0].UUID, creator.notifications[2].UUID)
 }

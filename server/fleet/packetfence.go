@@ -36,6 +36,7 @@ type PfRevocationFinding struct {
 	PfEventType              string     `db:"pf_event_type" json:"pf_event_type"`
 	PfEventID                *string    `db:"pf_event_id" json:"pf_event_id,omitempty"`
 	PfTaskKey                *string    `db:"pf_task_key" json:"pf_task_key,omitempty"`
+	FireID                   *string    `db:"fire_id" json:"fire_id,omitempty"`
 	FiredAt                  time.Time  `db:"fired_at" json:"fired_at"`
 	State                    string     `db:"state" json:"state"`
 	CleanChecks              int        `db:"clean_checks" json:"clean_checks"`

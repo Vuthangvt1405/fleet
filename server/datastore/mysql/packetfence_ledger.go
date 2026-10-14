@@ -12,7 +12,7 @@ import (
 )
 
 const pfLedgerColumns = `
-  id, host_id, host_mac, trigger_type, policy_id, cve,
+  id, host_id, host_mac, trigger_type, policy_id, cve, fire_id,
   pf_event_type, pf_event_id, pf_task_key, fired_at, state, clean_checks,
   last_counted_observation_id, last_observation_at, next_retry_at,
   last_error, ownership_block_reason, created_at, updated_at`
@@ -46,13 +46,13 @@ func (ds *Datastore) FindOpenPfRevocationFinding(ctx context.Context, f *fleet.P
 func (ds *Datastore) CreatePfRevocationFinding(ctx context.Context, f *fleet.PfRevocationFinding) (*fleet.PfRevocationFinding, error) {
 	const stmt = `
   INSERT INTO pf_revocation_ledger (
-    host_id, host_mac, trigger_type, policy_id, cve,
+    host_id, host_mac, trigger_type, policy_id, cve, fire_id,
     pf_event_type, pf_event_id, pf_task_key, fired_at, state, clean_checks,
     last_counted_observation_id, last_observation_at, next_retry_at,
     last_error, ownership_block_reason
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	res, err := ds.writer(ctx).ExecContext(ctx, stmt,
-		f.HostID, f.HostMAC, f.TriggerType, f.PolicyID, f.CVE,
+		f.HostID, f.HostMAC, f.TriggerType, f.PolicyID, f.CVE, f.FireID,
 		f.PfEventType, f.PfEventID, f.PfTaskKey, f.FiredAt, f.State, f.CleanChecks,
 		f.LastCountedObservationID, f.LastObservationAt, f.NextRetryAt,
 		f.LastError, f.OwnershipBlockReason)
@@ -88,9 +88,13 @@ func (ds *Datastore) UpsertPfRevocationFinding(ctx context.Context, f *fleet.PfR
 			f.HostID, f.TriggerType, f.PolicyID, f.CVE, f.PfEventType)
 		switch {
 		case err == nil:
+			if f.FireID != nil && existing.FireID != nil && *f.FireID == *existing.FireID {
+				out = &existing
+				return nil
+			}
 			const upd = `
   UPDATE pf_revocation_ledger SET
-    host_mac = ?, pf_task_key = ?, fired_at = ?, state = ?,
+    host_mac = ?, pf_task_key = ?, fire_id = ?, fired_at = ?, state = ?,
     clean_checks = 0, last_counted_observation_id = NULL,
     last_observation_at = NULL, next_retry_at = NULL, last_error = NULL,
     ownership_block_reason = NULL
@@ -100,11 +104,12 @@ func (ds *Datastore) UpsertPfRevocationFinding(ctx context.Context, f *fleet.PfR
 				state = fleet.PfStatePendingDiscovery
 			}
 			if _, err := tx.ExecContext(ctx, upd,
-				f.HostMAC, f.PfTaskKey, f.FiredAt, state, existing.ID); err != nil {
+				f.HostMAC, f.PfTaskKey, f.FireID, f.FiredAt, state, existing.ID); err != nil {
 				return ctxerr.Wrap(ctx, err, "refresh pf revocation finding")
 			}
 			existing.HostMAC = f.HostMAC
 			existing.PfTaskKey = f.PfTaskKey
+			existing.FireID = f.FireID
 			existing.FiredAt = f.FiredAt
 			existing.State = state
 			existing.CleanChecks = 0
@@ -113,17 +118,17 @@ func (ds *Datastore) UpsertPfRevocationFinding(ctx context.Context, f *fleet.PfR
 		case errors.Is(err, sql.ErrNoRows):
 			const ins = `
   INSERT INTO pf_revocation_ledger (
-    host_id, host_mac, trigger_type, policy_id, cve,
+    host_id, host_mac, trigger_type, policy_id, cve, fire_id,
     pf_event_type, pf_event_id, pf_task_key, fired_at, state, clean_checks,
     last_counted_observation_id, last_observation_at, next_retry_at,
     last_error, ownership_block_reason
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 			state := f.State
 			if state == "" {
 				state = fleet.PfStatePendingDiscovery
 			}
 			res, err := tx.ExecContext(ctx, ins,
-				f.HostID, f.HostMAC, f.TriggerType, f.PolicyID, f.CVE,
+				f.HostID, f.HostMAC, f.TriggerType, f.PolicyID, f.CVE, f.FireID,
 				f.PfEventType, f.PfEventID, f.PfTaskKey, f.FiredAt, state, f.CleanChecks,
 				f.LastCountedObservationID, f.LastObservationAt, f.NextRetryAt,
 				f.LastError, f.OwnershipBlockReason)
