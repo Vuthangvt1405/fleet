@@ -103,12 +103,20 @@ func RecordPolicyFire(
 		return nil, ctxerr.New(ctx, "host has no primary MAC for pf fire")
 	}
 	pid := policyID
+	// A policy report timestamp stays stable when the accepted webhook batch is
+	// retried, and advances when the host reports a later policy evaluation.
+	occurrenceAt := host.PolicyUpdatedAt
+	if occurrenceAt.IsZero() {
+		occurrenceAt = firedAt
+	}
+	fireID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("fleet-packetfence-policy-fire:%d:%d:%s", hostID, policyID, occurrenceAt.UTC().Format(time.RFC3339Nano)))).String()
 	finding, err := ds.UpsertPfRevocationFinding(ctx, &fleet.PfRevocationFinding{
 		HostID:      hostID,
 		HostMAC:     mac,
 		TriggerType: fleet.PfTriggerPolicy,
 		PolicyID:    &pid,
 		PfEventType: eventType,
+		FireID:      &fireID,
 		FiredAt:     firedAt,
 		State:       fleet.PfStatePendingDiscovery,
 	})
@@ -140,9 +148,8 @@ func RecordPolicyFireBatch(
 }
 
 // QueuePolicyFireNotification queues an idempotent end-user message for a
-// PacketFence policy fire. The PacketFence ledger row ID is stable across
-// webhook retries for the same open finding and therefore provides the
-// notification's deterministic UUID.
+// PacketFence policy fire. FireID distinguishes policy-report occurrences
+// while staying stable across accepted webhook retries.
 func QueuePolicyFireNotification(
 	ctx context.Context,
 	notificationsSvc policyNotificationCreator,
@@ -182,7 +189,11 @@ func QueuePolicyFireNotification(
 	if err != nil {
 		return ctxerr.Wrap(ctx, err, "marshal packetfence policy notification")
 	}
-	notificationUUID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("fleet-packetfence-policy-fire:%d", finding.ID))).String()
+	occurrenceID := fmt.Sprintf("ledger-%d", finding.ID)
+	if finding.FireID != nil && *finding.FireID != "" {
+		occurrenceID = *finding.FireID
+	}
+	notificationUUID := uuid.NewSHA1(uuid.NameSpaceURL, []byte("fleet-packetfence-policy-fire:"+occurrenceID)).String()
 	expiresAt := firedAt.UTC().Add(notifications_api.EndUserNotificationMaxLifetime)
 	_, err = notificationsSvc.CreateNotification(ctx, &notifications_api.EndUserNotification{
 		UUID:      notificationUUID,
